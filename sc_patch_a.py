@@ -414,7 +414,7 @@ if os.path.isfile(MODEL_SAVE_PATH):
 ############################
 
 
-for epoch in range(last_epoch:num_epochs):
+for epoch in range(last_epoch, num_epochs):
     train_running_loss = []
     val_running_loss = []
     start_time = time.time()
