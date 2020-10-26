@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[1]:
-
-
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
@@ -37,11 +31,34 @@ from glob import glob
 from torchsummary import summary
 
 import math
+import os
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 
 
+#########################################
+# Parameters 
+#########################################
+
+training_image_paths = glob('Objects365/train/*.jpg')
+validation_image_paths = glob('Objects365/val/*.jpg')
+patch_dim = 96
+train_dataset_length = 10000
+validation_dataset_length = 1000
+gap = 48
+jitter = 7
+train_batch_size = 256
+validation_batch_size = 128
+num_epochs = 50
+learn_rate = 0.0005
+
+MODEL_SAVE_PATH = f'model_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}.pt'
+
+
+#########################################
+# Utilities 
+#########################################
 
 def imshow(img,text=None,should_save=False):
     plt.figure(figsize=(10, 10))
@@ -71,8 +88,6 @@ class UnNormalize(object):
         return tensor
 
 unorm = UnNormalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
-
-
 
 
 #########################################
@@ -166,21 +181,6 @@ class MyDataset(Dataset):
 
 
 
-training_image_paths = glob('Objects365/train/*.jpg')
-validation_image_paths = glob('Objects365/val/*.jpg')
-patch_dim = 96
-train_dataset_length = 10000
-validation_dataset_length = 1000
-gap = 48
-jitter = 7
-train_batch_size = 256
-validation_batch_size = 128
-num_epochs = 50
-learn_rate = 0.0005
-
-
-
-
 ##################################################
 # Creating Train/Validation dataset and dataloader
 ##################################################
@@ -190,9 +190,7 @@ traindataset = MyDataset(training_image_paths, patch_dim, train_dataset_length, 
 
 trainloader = torch.utils.data.DataLoader(traindataset, 
                                           batch_size=train_batch_size,
-                                          shuffle=False,
-                                          # num_workers=Config.num_workers
-                                          )
+                                          shuffle=False)
 
 
 valdataset = MyDataset(validation_image_paths, patch_dim, validation_dataset_length, gap, jitter,
@@ -201,8 +199,6 @@ valdataset = MyDataset(validation_image_paths, patch_dim, validation_dataset_len
 valloader = torch.utils.data.DataLoader(valdataset,
                                         batch_size=validation_batch_size,
                                         shuffle=False)
-
-
 
 
 
@@ -380,6 +376,7 @@ summary(model, [(3, 96, 96), (3, 96, 96)])
 
 
 
+
 #############################################
 # Initialized Optimizer, criterion, scheduler
 #############################################
@@ -392,16 +389,32 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
                                            factor=0.3, verbose=True)
 
 
+#############################################
+# Load Checkpoint
+#############################################
+
+global_trn_loss = []
+global_val_loss = []
+
+last_epoch = 0
+
+if os.path.isfile(MODEL_SAVE_PATH): 
+  print('Loading Checkpoint...')
+  checkpoint = torch.load(MODEL_SAVE_PATH)
+  model.load_state_dict(checkpoint['model_state_dict'])
+  optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+  last_epoch = checkpoint['epoch']
+  loss = checkpoint['loss']
+  global_trn_loss = checkpoint['global_trnloss']
+  global_val_loss = checkpoint['global_valloss']
+
 
 ############################
 # Training/Validation Engine
 ############################
 
-global_trn_loss = []
-global_val_loss = []
-# previous_val_loss = 100
 
-for epoch in range(num_epochs):
+for epoch in range(last_epoch:num_epochs):
     train_running_loss = []
     val_running_loss = []
     start_time = time.time()
@@ -442,11 +455,10 @@ for epoch in range(num_epochs):
         epoch + 1, num_epochs, global_trn_loss[-1], global_val_loss[-1],
         (time.time() - start_time) / 60))
     
-    if epoch % 20 == 0:
-      MODEL_SAVE_PATH = f'model_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}.pt'
+    if epoch % 5 == 0:
       torch.save(
         {
-            'epoch': num_epochs,
+            'epoch': epoch,
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             'loss': loss,
