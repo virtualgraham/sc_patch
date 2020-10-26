@@ -50,7 +50,7 @@ gap = 48
 jitter = 7
 train_batch_size = 256
 validation_batch_size = 128
-num_epochs = 50
+num_epochs = 6000
 learn_rate = 0.0005
 
 MODEL_SAVE_PATH = f'model_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}.pt'
@@ -458,6 +458,7 @@ for epoch in range(last_epoch, num_epochs):
         (time.time() - start_time) / 60))
     
     if epoch % 5 == 0:
+      print('saving checkpoint', MODEL_SAVE_PATH)
       torch.save(
         {
             'epoch': epoch,
