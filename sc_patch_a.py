@@ -54,7 +54,7 @@ num_epochs = 1500
 learn_rate = 0.0005
 save_after_epochs = 1 
 
-MODEL_SAVE_PATH = f'model_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}.pt'
+# MODEL_SAVE_PATH = f'model_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}.pt'
 
 
 #########################################
@@ -399,10 +399,15 @@ global_val_loss = []
 
 last_epoch = 0
 
-if os.path.isfile(MODEL_SAVE_PATH): 
+
+training_image_paths = glob(f'model_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_*.pt')
+
+if len(training_image_paths) > 0:
+  training_image_paths.sort()
+  model_save_path = training_image_paths[-1]
   try:
-    print('Loading Checkpoint...')
-    checkpoint = torch.load(MODEL_SAVE_PATH)
+    print('Loading Checkpoint...', model_save_path)
+    checkpoint = torch.load(model_save_path)
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     last_epoch = checkpoint['epoch']
@@ -462,7 +467,8 @@ for epoch in range(last_epoch, num_epochs):
         (time.time() - start_time) / 60))
     
     if epoch % save_after_epochs == 0:
-      print('saving checkpoint', MODEL_SAVE_PATH)
+      model_save_path = f'model_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_{epoch:04d}.pt'
+      print('saving checkpoint', model_save_path)
       torch.save(
         {
             'epoch': epoch,
@@ -471,7 +477,7 @@ for epoch in range(last_epoch, num_epochs):
             'loss': loss,
             'global_trnloss': global_trn_loss,
             'global_valloss': global_val_loss
-        }, MODEL_SAVE_PATH)
+        }, model_save_path)
 
 
 print("done")
