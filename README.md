@@ -1,8 +1,10 @@
 # sc_patch
 
-Experiments with representation leaning based on:
+Experiments with representation learning based on:
 
 https://github.com/cdoersch/deepcontext
+and
+https://github.com/abhisheksambyal/Self-supervised-learning-by-context-prediction
 
 ```
 @inproceedings{doersch2015unsupervised,

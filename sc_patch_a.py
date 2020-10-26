@@ -42,8 +42,6 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 
 
-# In[2]:
-
 
 def imshow(img,text=None,should_save=False):
     plt.figure(figsize=(10, 10))
@@ -74,8 +72,6 @@ class UnNormalize(object):
 
 unorm = UnNormalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
 
-
-# In[3]:
 
 
 
@@ -169,8 +165,6 @@ class MyDataset(Dataset):
     return uniform_patch, random_patch, patch_direction_label
 
 
-# In[4]:
-
 
 training_image_paths = glob('Objects365/train/*.jpg')
 validation_image_paths = glob('Objects365/val/*.jpg')
@@ -185,7 +179,6 @@ num_epochs = 50
 learn_rate = 0.0005
 
 
-# In[5]:
 
 
 ##################################################
@@ -210,20 +203,6 @@ valloader = torch.utils.data.DataLoader(valdataset,
                                         shuffle=False)
 
 
-# In[6]:
-
-
-##############################
-# Visualizing validation dataset
-##############################
-
-# example_batch_val = next(iter(valloader))
-# concatenated = torch.cat((unorm(example_batch_val[0]),unorm(example_batch_val[1])),0)
-# imshow(torchvision.utils.make_grid(concatenated))
-# print(f'Labels: {example_batch_val[2].numpy()}')
-
-
-# In[7]:
 
 
 
@@ -400,8 +379,6 @@ model = AlexNetwork().to(device)
 summary(model, [(3, 96, 96), (3, 96, 96)])
 
 
-# In[8]:
-
 
 #############################################
 # Initialized Optimizer, criterion, scheduler
@@ -413,9 +390,6 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
                                            mode='min',
                                            patience=5,
                                            factor=0.3, verbose=True)
-
-
-# In[ ]:
 
 
 
@@ -480,8 +454,6 @@ for epoch in range(num_epochs):
             'global_valloss': global_val_loss
         }, MODEL_SAVE_PATH)
 
-
-# In[ ]:
 
 
 
