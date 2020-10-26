@@ -399,15 +399,17 @@ global_val_loss = []
 last_epoch = 0
 
 if os.path.isfile(MODEL_SAVE_PATH): 
-  print('Loading Checkpoint...')
-  checkpoint = torch.load(MODEL_SAVE_PATH)
-  model.load_state_dict(checkpoint['model_state_dict'])
-  optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-  last_epoch = checkpoint['epoch']
-  loss = checkpoint['loss']
-  global_trn_loss = checkpoint['global_trnloss']
-  global_val_loss = checkpoint['global_valloss']
-
+  try:
+    print('Loading Checkpoint...')
+    checkpoint = torch.load(MODEL_SAVE_PATH)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    last_epoch = checkpoint['epoch']
+    loss = checkpoint['loss']
+    global_trn_loss = checkpoint['global_trnloss']
+    global_val_loss = checkpoint['global_valloss']
+  except:
+    print("Loading Checkpoint Failed")
 
 ############################
 # Training/Validation Engine
