@@ -44,14 +44,15 @@ print(device)
 training_image_paths = glob('Objects365/train/*.jpg')
 validation_image_paths = glob('Objects365/val/*.jpg')
 patch_dim = 96
-train_dataset_length = 10000
-validation_dataset_length = 1000
+train_dataset_length = 40000
+validation_dataset_length = 2000
 gap = 48
 jitter = 7
 train_batch_size = 256
 validation_batch_size = 128
-num_epochs = 6000
+num_epochs = 1500
 learn_rate = 0.0005
+save_after_epochs = 1 
 
 MODEL_SAVE_PATH = f'model_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}.pt'
 
@@ -457,7 +458,7 @@ for epoch in range(last_epoch, num_epochs):
         epoch + 1, num_epochs, global_trn_loss[-1], global_val_loss[-1],
         (time.time() - start_time) / 60))
     
-    if epoch % 5 == 0:
+    if epoch % save_after_epochs == 0:
       print('saving checkpoint', MODEL_SAVE_PATH)
       torch.save(
         {
