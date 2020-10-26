@@ -423,7 +423,7 @@ if len(training_image_paths) > 0:
 
 print("starting train loop")
 
-for epoch in range(last_epoch, num_epochs):
+for epoch in range(last_epoch+1, num_epochs):
     print("epoch", epoch)
 
     train_running_loss = []
