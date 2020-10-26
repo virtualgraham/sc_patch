@@ -416,8 +416,11 @@ if os.path.isfile(MODEL_SAVE_PATH):
 # Training/Validation Engine
 ############################
 
+print("starting train loop")
 
 for epoch in range(last_epoch, num_epochs):
+    print("epoch", epoch)
+
     train_running_loss = []
     val_running_loss = []
     start_time = time.time()
@@ -471,6 +474,6 @@ for epoch in range(last_epoch, num_epochs):
         }, MODEL_SAVE_PATH)
 
 
-
+print("done")
 
 
