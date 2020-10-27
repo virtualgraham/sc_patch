@@ -418,11 +418,10 @@ global_val_loss = []
 
 last_epoch = 0
 
-
 training_image_paths = glob(f'model_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_*.pt')
 
 if len(training_image_paths) > 0:
-  training_image_paths.sort()
+  
   model_save_path = training_image_paths[-1]
   try:
     print('Loading Checkpoint...', model_save_path)
@@ -486,6 +485,15 @@ for epoch in range(last_epoch+1, num_epochs):
         (time.time() - start_time) / 60))
     
     if epoch % save_after_epochs == 0:
+
+      # delete old images
+      training_image_paths = glob(f'model_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_*.pt')
+      if len(training_image_paths) > 2:
+        training_image_paths.sort()
+        for training_image_path in range(len(training_image_paths)-2):
+          os.remove(training_image_path)
+
+      # save new image
       model_save_path = f'model_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_{epoch:04d}.pt'
       print('saving checkpoint', model_save_path)
       torch.save(

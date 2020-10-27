@@ -14,3 +14,11 @@ https://github.com/abhisheksambyal/Self-supervised-learning-by-context-predictio
     Year = {2015}
 }
 ```
+
+start.sh
+```
+#!/bin/bash
+
+cd /home/ubuntu
+python3 testing.py &> python.out &
+```
