@@ -491,7 +491,8 @@ for epoch in range(last_epoch+1, num_epochs):
       training_image_paths = glob(f'model_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_*.pt')
       if len(training_image_paths) > 2:
         training_image_paths.sort()
-        for training_image_path in range(len(training_image_paths)-2):
+        for i in range(len(training_image_paths)-2):
+          training_image_path = training_image_paths[i]
           os.remove(training_image_path)
 
       # save new image
