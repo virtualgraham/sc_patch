@@ -104,7 +104,6 @@ class MyDataset(Dataset):
     self.gap = gap
     self.jitter = jitter
     self.transform = transform
-    self.margin = patch_dim + round(patch_dim/2.0) + gap + jitter
 
   def __len__(self):
     return self.length
@@ -134,32 +133,52 @@ class MyDataset(Dataset):
     
     image_index = int(math.floor((len(self.image_paths) * random.random())))
     
-#     if(index % 1024 == 0):
-#         print('self.image_paths[image_index]', self.image_paths[image_index])
-        
-    # print('__getitem__', image_index, self.image_paths[image_index])
-    
-    image = np.array(Image.open(self.image_paths[image_index]).convert('RGB'))
-    
+
+
+    pil_image = Image.open(self.image_paths[image_index]).convert('RGB')
+
+    # Imagenet 150000 -> 180000 -> 450000
+    # 0.826 -> 2.479
+    # Objects365 300000 -> 370000 -> 925000
+
+    # original_size = pil_image.size
+    # randpix = int(math.sqrt(random.random() * (95 * 95 - 10 * 10) + 10 * 10))
+    # pil_image = pil_image.resize((randpix, randpix)) 
+
+
+    image = np.array(pil_image)
+
+
     # If image is too small, try another image
-    if (image.shape[0] - self.margin*2) <= 0 or (image.shape[1] - self.margin*2) <= 0:
+    min_width = 3*patch_dim + 2*jitter + 2*gap
+    if (image.shape[0] - min_width) <= 0 or (image.shape[1] - min_width) <= 0:
         # print("trying another image")
         return self.__getitem__(index)
     
     #print('__getitem__ image.shape', image.shape, self.margin, (image.shape[0] - self.margin*2), (image.shape[1] - self.margin*2))
     
-    uniform_patch_y_coord = int(math.floor((image.shape[0] - self.margin*2) * random.random())) + self.margin - int(round(self.patch_dim/2.0))
-    uniform_patch_x_coord = int(math.floor((image.shape[1] - self.margin*2) * random.random())) + self.margin - int(round(self.patch_dim/2.0))
+    margin = math.ceil(patch_dim/2.0) + jitter
 
     patch_direction_label = int(math.floor((8 * random.random())))
-
+    
     patch_jitter_y = int(math.floor((self.jitter * 2 * random.random()))) - self.jitter
     patch_jitter_x = int(math.floor((self.jitter * 2 * random.random()))) - self.jitter
+        
+    while True:
+        
+        uniform_patch_y_coord = int(math.floor((image.shape[0] - margin*2) * random.random())) + margin - int(round(self.patch_dim/2.0))
+        uniform_patch_x_coord = int(math.floor((image.shape[1] - margin*2) * random.random())) + margin - int(round(self.patch_dim/2.0))
 
-    random_patch_y_coord = uniform_patch_y_coord + patch_loc_arr[patch_direction_label][0] * (self.patch_dim + self.gap) + patch_jitter_y
-    random_patch_x_coord = uniform_patch_x_coord + patch_loc_arr[patch_direction_label][1] * (self.patch_dim + self.gap) + patch_jitter_x
+        random_patch_y_coord = uniform_patch_y_coord + patch_loc_arr[patch_direction_label][0] * (self.patch_dim + self.gap) + patch_jitter_y
+        random_patch_x_coord = uniform_patch_x_coord + patch_loc_arr[patch_direction_label][1] * (self.patch_dim + self.gap) + patch_jitter_x
 
-    uniform_patch = image[uniform_patch_y_coord:uniform_patch_y_coord+self.patch_dim, uniform_patch_x_coord:uniform_patch_x_coord+self.patch_dim]
+        if random_patch_y_coord >= 0 and random_patch_x_coord >= 0 and random_patch_y_coord < (image.shape[0] - patch_dim) and random_patch_x_coord < (image.shape[1] - patch_dim):
+            #print("found")
+            break
+            
+        #print("not found")
+
+    uniform_patch = image[uniform_patch_y_coord:uniform_patch_y_coord+self.patch_dim, uniform_patch_x_coord:uniform_patch_x_coord+self.patch_dim]        
     random_patch = image[random_patch_y_coord:random_patch_y_coord+self.patch_dim, random_patch_x_coord:random_patch_x_coord+self.patch_dim]
 
     # print('__getitem__ patch coords', uniform_patch_y_coord, uniform_patch_y_coord, random_patch_x_coord, random_patch_x_coord)
