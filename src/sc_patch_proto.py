@@ -37,7 +37,6 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 
 
-
 #########################################
 # Parameters 
 #########################################
@@ -55,6 +54,7 @@ num_epochs = 1500
 learn_rate = 0.0005
 save_after_epochs = 1 
 
+MODEL_SAVE_PATH = f'model_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}.pt'
 
 
 #########################################
@@ -82,12 +82,13 @@ class UnNormalize(object):
         self.std = std
 
     def __call__(self, tensor):
-        for i, t in enumerate(tensor):
-            t.mul_(self.std[i%3]).add_(self.mean[i%3])
+        print('before', tensor[0])
+        for t, m, s in zip(tensor, self.mean, self.std):
+            t.mul_(s).add_(m)
+        print('after', tensor[0])
         return tensor
 
 unorm = UnNormalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
-
 
 
 #########################################
@@ -103,6 +104,7 @@ class MyDataset(Dataset):
     self.gap = gap
     self.jitter = jitter
     self.transform = transform
+    self.margin = patch_dim + round(patch_dim/2.0) + gap + jitter
 
   def __len__(self):
     return self.length
@@ -132,43 +134,38 @@ class MyDataset(Dataset):
     
     image_index = int(math.floor((len(self.image_paths) * random.random())))
     
-    pil_image = Image.open(self.image_paths[image_index]).convert('RGB')
-
-    # Imagenet 150000 -> 180000 -> 450000
-    # 0.826 -> 2.479
-    # Objects365 300000 -> 370000 -> 925000
-
-    # original_size = pil_image.size
-    # randpix = int(math.sqrt(random.random() * (95 * 95 - 10 * 10) + 10 * 10))
-    # pil_image = pil_image.resize((randpix, randpix)) 
-
-    image = np.array(pil_image)
-
+#     if(index % 1024 == 0):
+#         print('self.image_paths[image_index]', self.image_paths[image_index])
+        
+    # print('__getitem__', image_index, self.image_paths[image_index])
+    
+    image = np.array(Image.open(self.image_paths[image_index]).convert('RGB'))
+    
     # If image is too small, try another image
-    min_width = 3*patch_dim + 2*jitter + 2*gap
-    if (image.shape[0] - min_width) <= 0 or (image.shape[1] - min_width) <= 0:
+    if (image.shape[0] - self.margin*2) <= 0 or (image.shape[1] - self.margin*2) <= 0:
+        # print("trying another image")
         return self.__getitem__(index)
     
-    margin = math.ceil(patch_dim/2.0) + jitter
+    #print('__getitem__ image.shape', image.shape, self.margin, (image.shape[0] - self.margin*2), (image.shape[1] - self.margin*2))
+    
+    uniform_patch_y_coord = int(math.floor((image.shape[0] - self.margin*2) * random.random())) + self.margin - int(round(self.patch_dim/2.0))
+    uniform_patch_x_coord = int(math.floor((image.shape[1] - self.margin*2) * random.random())) + self.margin - int(round(self.patch_dim/2.0))
 
     patch_direction_label = int(math.floor((8 * random.random())))
-    
+
     patch_jitter_y = int(math.floor((self.jitter * 2 * random.random()))) - self.jitter
     patch_jitter_x = int(math.floor((self.jitter * 2 * random.random()))) - self.jitter
-        
-    while True:
-        
-        uniform_patch_y_coord = int(math.floor((image.shape[0] - margin*2) * random.random())) + margin - int(round(self.patch_dim/2.0))
-        uniform_patch_x_coord = int(math.floor((image.shape[1] - margin*2) * random.random())) + margin - int(round(self.patch_dim/2.0))
 
-        random_patch_y_coord = uniform_patch_y_coord + patch_loc_arr[patch_direction_label][0] * (self.patch_dim + self.gap) + patch_jitter_y
-        random_patch_x_coord = uniform_patch_x_coord + patch_loc_arr[patch_direction_label][1] * (self.patch_dim + self.gap) + patch_jitter_x
+    random_patch_y_coord = uniform_patch_y_coord + patch_loc_arr[patch_direction_label][0] * (self.patch_dim + self.gap) + patch_jitter_y
+    random_patch_x_coord = uniform_patch_x_coord + patch_loc_arr[patch_direction_label][1] * (self.patch_dim + self.gap) + patch_jitter_x
 
-        if random_patch_y_coord >= 0 and random_patch_x_coord >= 0 and random_patch_y_coord < (image.shape[0] - patch_dim) and random_patch_x_coord < (image.shape[1] - patch_dim):
-            break
-
-    uniform_patch = image[uniform_patch_y_coord:uniform_patch_y_coord+self.patch_dim, uniform_patch_x_coord:uniform_patch_x_coord+self.patch_dim]        
+    uniform_patch = image[uniform_patch_y_coord:uniform_patch_y_coord+self.patch_dim, uniform_patch_x_coord:uniform_patch_x_coord+self.patch_dim]
     random_patch = image[random_patch_y_coord:random_patch_y_coord+self.patch_dim, random_patch_x_coord:random_patch_x_coord+self.patch_dim]
+
+    # print('__getitem__ patch coords', uniform_patch_y_coord, uniform_patch_y_coord, random_patch_x_coord, random_patch_x_coord)
+    
+#     if(index % 1000 == 0):
+#         print('__getitem__', index, patch_direction_label, self.image_paths[image_index])
         
     self.prep_patch(uniform_patch)
     self.prep_patch(random_patch)
@@ -178,6 +175,8 @@ class MyDataset(Dataset):
     if self.transform:
       uniform_patch = self.transform(uniform_patch)
       random_patch = self.transform(random_patch)
+
+
 
     return uniform_patch, random_patch, patch_direction_label
 
@@ -289,6 +288,74 @@ class AlexNetwork(nn.Module):
         nn.Dropout(),
         nn.Linear(4096, 8),
       )
+    
+    
+#       self.cnn = nn.Sequential(
+#         nn.Conv2d(3, 96, kernel_size=11, stride=4, padding=5),
+#         nn.ReLU(inplace=True),
+#         nn.MaxPool2d(kernel_size=3, stride=2),
+#         nn.LocalResponseNorm(5),
+        
+#         nn.Conv2d(96, 256, kernel_size=5, stride=1, padding=2),
+#         nn.ReLU(inplace=True),
+#         nn.MaxPool2d(kernel_size=3, stride=2),
+#         nn.LocalResponseNorm(5),
+        
+#         nn.Conv2d(256, 384, kernel_size=3, stride=1, padding=1),
+#         nn.BatchNorm2d(384),
+#         nn.ReLU(inplace=True),
+        
+#         nn.Conv2d(384, 384, kernel_size=3, stride=1, padding=1),
+#         nn.BatchNorm2d(384),
+#         nn.ReLU(inplace=True),
+        
+#         nn.Conv2d(384, 256, kernel_size=3, stride=1, padding=1),
+#         nn.BatchNorm2d(256),
+#         nn.ReLU(inplace=True),
+        
+#         nn.MaxPool2d(kernel_size=3, stride=2),
+#       )
+    
+#       self.cnn = nn.Sequential(
+#         nn.Conv2d(3, 96, kernel_size=11, stride=4),
+#         nn.ReLU(inplace=True),
+#         nn.MaxPool2d(kernel_size=3, stride=2),
+#         nn.LocalResponseNorm(96),
+        
+#         nn.Conv2d(96, 384, kernel_size=5, stride = 2,padding = 2),
+#         nn.ReLU(inplace=True),
+#         nn.MaxPool2d(kernel_size=3, stride=2),
+#         nn.LocalResponseNorm(384),
+        
+#         nn.Conv2d(384, 384, kernel_size=3, stride=1,padding = 1),
+#         nn.ReLU(inplace=True),
+#         nn.BatchNorm2d(384),
+        
+#         nn.Conv2d(384, 384, kernel_size=3, stride=1,padding = 1),
+#         nn.ReLU(inplace=True),
+#         nn.BatchNorm2d(384),
+        
+#         nn.Conv2d(384, 256, kernel_size=3, stride=1,padding = 1),
+#         nn.ReLU(inplace=True),
+#         nn.BatchNorm2d(256),
+#         nn.MaxPool2d(kernel_size=3, stride=2,padding = 1),
+#       )
+
+#       self.fc6 = nn.Sequential(
+#         nn.Linear((512 * 3 * 3),4096),
+#         nn.ReLU(inplace=True),
+#         nn.BatchNorm1d(4096),
+#       )
+
+#       self.fc = nn.Sequential(
+#         nn.Linear(2*4096,4096),
+#         nn.ReLU(inplace=True),
+
+#         nn.Linear(4096, 4096),
+#         nn.ReLU(inplace=True),
+
+#         nn.Linear(4096, 8)
+#       )
 
   def forward_once(self, x):
     output= self.cnn(x)
@@ -310,6 +377,7 @@ summary(model, [(3, 96, 96), (3, 96, 96)])
 
 
 
+
 #############################################
 # Initialized Optimizer, criterion, scheduler
 #############################################
@@ -318,9 +386,8 @@ optimizer = optim.Adam(model.parameters(), lr=learn_rate)
 criterion = nn.CrossEntropyLoss()
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 
                                            mode='min',
-                                           patience=10,
+                                           patience=5,
                                            factor=0.3, verbose=True)
-
 
 
 #############################################
@@ -332,14 +399,10 @@ global_val_loss = []
 
 last_epoch = 0
 
-training_image_paths = glob(f'model_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_*.pt')
-
-if len(training_image_paths) > 0:
-  training_image_paths.sort()  
-  model_save_path = training_image_paths[-1]
+if os.path.isfile(MODEL_SAVE_PATH): 
   try:
-    print('Loading Checkpoint...', model_save_path)
-    checkpoint = torch.load(model_save_path)
+    print('Loading Checkpoint...')
+    checkpoint = torch.load(MODEL_SAVE_PATH)
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     last_epoch = checkpoint['epoch']
@@ -349,17 +412,12 @@ if len(training_image_paths) > 0:
   except:
     print("Loading Checkpoint Failed")
 
-
-
 ############################
 # Training/Validation Engine
 ############################
 
-print("starting train loop")
 
-for epoch in range(last_epoch+1, num_epochs):
-    print("epoch", epoch)
-
+for epoch in range(last_epoch, num_epochs):
     train_running_loss = []
     val_running_loss = []
     start_time = time.time()
@@ -401,18 +459,7 @@ for epoch in range(last_epoch+1, num_epochs):
         (time.time() - start_time) / 60))
     
     if epoch % save_after_epochs == 0:
-
-      # delete old images
-      training_image_paths = glob(f'model_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_*.pt')
-      if len(training_image_paths) > 2:
-        training_image_paths.sort()
-        for i in range(len(training_image_paths)-2):
-          training_image_path = training_image_paths[i]
-          os.remove(training_image_path)
-
-      # save new image
-      model_save_path = f'model_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_{epoch:04d}.pt'
-      print('saving checkpoint', model_save_path)
+      print('saving checkpoint', MODEL_SAVE_PATH)
       torch.save(
         {
             'epoch': epoch,
@@ -421,8 +468,9 @@ for epoch in range(last_epoch+1, num_epochs):
             'loss': loss,
             'global_trnloss': global_trn_loss,
             'global_valloss': global_val_loss
-        }, model_save_path)
+        }, MODEL_SAVE_PATH)
 
 
 
-print("done")
+
+
