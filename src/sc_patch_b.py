@@ -330,7 +330,7 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
 global_trn_loss = []
 global_val_loss = []
 
-last_epoch = 0
+last_epoch = -1
 
 training_image_paths = glob(f'model_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_*.pt')
 
