@@ -1,0 +1,1 @@
+sudo mount /dev/nvme /data1n1

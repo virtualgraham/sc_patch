@@ -99,29 +99,29 @@ unorm = UnNormalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
 #########################################
 
 patch_order_arr = [
-  (0, 1, 2, 3)
-  (0, 1, 3, 2)
-  (0, 2, 1, 3)
-  (0, 2, 3, 1)
-  (0, 3, 1, 2)
-  (0, 3, 2, 1)
-  (1, 0, 2, 3)
-  (1, 0, 3, 2)
-  (1, 2, 0, 3)
-  (1, 2, 3, 0)
-  (1, 3, 0, 2)
-  (1, 3, 2, 0)
-  (2, 0, 1, 3)
-  (2, 0, 3, 1)
-  (2, 1, 0, 3)
-  (2, 1, 3, 0)
-  (2, 3, 0, 1)
-  (2, 3, 1, 0)
-  (3, 0, 1, 2)
-  (3, 0, 2, 1)
-  (3, 1, 0, 2)
-  (3, 1, 2, 0)
-  (3, 2, 0, 1)
+  (0, 1, 2, 3),
+  (0, 1, 3, 2),
+  (0, 2, 1, 3),
+  (0, 2, 3, 1),
+  (0, 3, 1, 2),
+  (0, 3, 2, 1),
+  (1, 0, 2, 3),
+  (1, 0, 3, 2),
+  (1, 2, 0, 3),
+  (1, 2, 3, 0),
+  (1, 3, 0, 2),
+  (1, 3, 2, 0),
+  (2, 0, 1, 3),
+  (2, 0, 3, 1),
+  (2, 1, 0, 3),
+  (2, 1, 3, 0),
+  (2, 3, 0, 1),
+  (2, 3, 1, 0),
+  (3, 0, 1, 2),
+  (3, 0, 2, 1),
+  (3, 1, 0, 2),
+  (3, 1, 2, 0),
+  (3, 2, 0, 1),
   (3, 2, 1, 0)
 ]
 
@@ -135,15 +135,15 @@ class MyDataset(Dataset):
     self.jitter = jitter
     self.transform = transform
     self.margin = math.ceil((2*patch_dim + 2*jitter + gap)/2)
-    self.min_width = 2 * margin + 1
+    self.min_width = 2 * self.margin + 1
 
   def __len__(self):
     return self.length
   
-  def half_gap():
-    return math.ceil(self.gap/2))
+  def half_gap(self):
+    return math.ceil(self.gap/2)
 
-  def random_jitter():
+  def random_jitter(self):
     return int(math.floor((self.jitter * 2 * random.random()))) - self.jitter
 
   def prep_patch(self, image):
@@ -190,16 +190,16 @@ class MyDataset(Dataset):
 
     patch_coords = [
       (
-        center_y_coord - (self.patch_dim + self.half_gap() + self.random_jitter(),
-        center_x_coord - (self.patch_dim + self.half_gap() + self.random_jitter()
+        center_y_coord - (self.patch_dim + self.half_gap() + self.random_jitter()),
+        center_x_coord - (self.patch_dim + self.half_gap() + self.random_jitter())
       ),
       (
-        center_y_coord - (self.patch_dim + self.half_gap() + self.random_jitter(),
+        center_y_coord - (self.patch_dim + self.half_gap() + self.random_jitter()),
         center_x_coord + self.half_gap()+ self.random_jitter()
       ),
       (
         center_y_coord + self.half_gap() + self.random_jitter(),
-        center_x_coord - (self.patch_dim + self.half_gap() + self.random_jitter()
+        center_x_coord - (self.patch_dim + self.half_gap() + self.random_jitter())
       ),
       (
         center_y_coord + self.half_gap() + self.random_jitter(),
@@ -358,7 +358,7 @@ class AlexNetwork(nn.Module):
     return output, output_fc6_patch_a, output_fc6_patch_b, output_fc6_patch_c, output_fc6_patch_d
 
 model = AlexNetwork().to(device)
-summary(model, [(3, 96, 96), (3, 96, 96)])
+summary(model, [(3, 96, 96), (3, 96, 96), (3, 96, 96), (3, 96, 96)])
 
 
 
@@ -374,11 +374,6 @@ optimizer = optim.SGD(
 )
 
 criterion = nn.CrossEntropyLoss()
-
-# scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 
-#                                            mode='min',
-#                                            patience=10,
-#                                            factor=0.3, verbose=True)
 
 
 
