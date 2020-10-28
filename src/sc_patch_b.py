@@ -52,7 +52,11 @@ jitter = 7
 train_batch_size = 256
 validation_batch_size = 128
 num_epochs = 1500
-learn_rate = 0.0005
+
+learn_rate = 0.001
+momentum = 0.999
+weight_decay = 0.0005
+
 save_after_epochs = 1 
 
 
@@ -314,12 +318,19 @@ summary(model, [(3, 96, 96), (3, 96, 96)])
 # Initialized Optimizer, criterion, scheduler
 #############################################
 
-optimizer = optim.Adam(model.parameters(), lr=learn_rate)
+optimizer = optim.SGD(
+  model.parameters(), 
+  lr=learn_rate,
+  momentum=momentum,
+  weight_decay=weight_decay
+)
+
 criterion = nn.CrossEntropyLoss()
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 
-                                           mode='min',
-                                           patience=10,
-                                           factor=0.3, verbose=True)
+
+# scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 
+#                                            mode='min',
+#                                            patience=10,
+#                                            factor=0.3, verbose=True)
 
 
 
@@ -355,7 +366,7 @@ if len(training_image_paths) > 0:
 # Training/Validation Engine
 ############################
 
-print("starting train loop")
+print("starting train loop (b.0)")
 
 for epoch in range(last_epoch+1, num_epochs):
     print("epoch", epoch)
@@ -394,7 +405,7 @@ for epoch in range(last_epoch+1, num_epochs):
     global_trn_loss.append(sum(train_running_loss) / len(train_running_loss))
     global_val_loss.append(sum(val_running_loss) / len(val_running_loss))
 
-    scheduler.step(global_val_loss[-1])
+    # scheduler.step(global_val_loss[-1])
 
     print('Epoch [{}/{}], TRNLoss:{:.4f}, VALLoss:{:.4f}, Time:{:.2f}'.format(
         epoch + 1, num_epochs, global_trn_loss[-1], global_val_loss[-1],
