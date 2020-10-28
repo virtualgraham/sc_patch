@@ -45,8 +45,8 @@ print(device)
 training_image_paths = glob('Objects365/train/*.jpg')
 validation_image_paths = glob('Objects365/val/*.jpg')
 patch_dim = 96
-train_dataset_length = 40000 # 40192
-validation_dataset_length = 2000 # 2048
+train_dataset_length = 40192
+validation_dataset_length = 2048
 gap = 48
 jitter = 7
 train_batch_size = 256
@@ -98,6 +98,33 @@ unorm = UnNormalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
 # This class generates patches for training
 #########################################
 
+patch_order_arr = [
+  (0, 1, 2, 3)
+  (0, 1, 3, 2)
+  (0, 2, 1, 3)
+  (0, 2, 3, 1)
+  (0, 3, 1, 2)
+  (0, 3, 2, 1)
+  (1, 0, 2, 3)
+  (1, 0, 3, 2)
+  (1, 2, 0, 3)
+  (1, 2, 3, 0)
+  (1, 3, 0, 2)
+  (1, 3, 2, 0)
+  (2, 0, 1, 3)
+  (2, 0, 3, 1)
+  (2, 1, 0, 3)
+  (2, 1, 3, 0)
+  (2, 3, 0, 1)
+  (2, 3, 1, 0)
+  (3, 0, 1, 2)
+  (3, 0, 2, 1)
+  (3, 1, 0, 2)
+  (3, 1, 2, 0)
+  (3, 2, 0, 1)
+  (3, 2, 1, 0)
+]
+
 class MyDataset(Dataset):
 
   def __init__(self, image_paths, patch_dim, length, gap, jitter, transform=None):
@@ -107,10 +134,18 @@ class MyDataset(Dataset):
     self.gap = gap
     self.jitter = jitter
     self.transform = transform
+    self.margin = math.ceil((2*patch_dim + 2*jitter + gap)/2)
+    self.min_width = 2 * margin + 1
 
   def __len__(self):
     return self.length
   
+  def half_gap():
+    return math.ceil(self.gap/2))
+
+  def random_jitter():
+    return int(math.floor((self.jitter * 2 * random.random()))) - self.jitter
+
   def prep_patch(self, image):
     # print('prep_patch image.shape', image.shape)
     # for some patches, randomly downsample to as little as 100 total pixels
@@ -132,8 +167,6 @@ class MyDataset(Dataset):
   def __getitem__(self, index):
     # [y, x, chan], dtype=uint8, top_left is (0,0)
         
-    patch_loc_arr = [(-1, -1), (-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (1, -1), (0, -1)]
-    
     image_index = int(math.floor((len(self.image_paths) * random.random())))
     
     pil_image = Image.open(self.image_paths[image_index]).convert('RGB')
@@ -149,41 +182,54 @@ class MyDataset(Dataset):
     image = np.array(pil_image)
 
     # If image is too small, try another image
-    min_width = 3*patch_dim + 2*jitter + 2*gap
-    if (image.shape[0] - min_width) <= 0 or (image.shape[1] - min_width) <= 0:
+    if (image.shape[0] - self.min_width) <= 0 or (image.shape[1] - self.min_width) <= 0:
         return self.__getitem__(index)
     
-    margin = math.ceil(patch_dim/2.0) + jitter
+    center_y_coord = int(math.floor((image.shape[0] - self.margin*2) * random.random())) + self.margin
+    center_x_coord = int(math.floor((image.shape[1] - self.margin*2) * random.random())) + self.margin
 
-    patch_direction_label = int(math.floor((8 * random.random())))
+    patch_coords = [
+      (
+        center_y_coord - (self.patch_dim + self.half_gap() + self.random_jitter(),
+        center_x_coord - (self.patch_dim + self.half_gap() + self.random_jitter()
+      ),
+      (
+        center_y_coord - (self.patch_dim + self.half_gap() + self.random_jitter(),
+        center_x_coord + self.half_gap()+ self.random_jitter()
+      ),
+      (
+        center_y_coord + self.half_gap() + self.random_jitter(),
+        center_x_coord - (self.patch_dim + self.half_gap() + self.random_jitter()
+      ),
+      (
+        center_y_coord + self.half_gap() + self.random_jitter(),
+        center_x_coord + self.half_gap() + self.random_jitter()
+      )
+    ]
     
-    patch_jitter_y = int(math.floor((self.jitter * 2 * random.random()))) - self.jitter
-    patch_jitter_x = int(math.floor((self.jitter * 2 * random.random()))) - self.jitter
-        
-    while True:
-        
-        uniform_patch_y_coord = int(math.floor((image.shape[0] - margin*2) * random.random())) + margin - int(round(self.patch_dim/2.0))
-        uniform_patch_x_coord = int(math.floor((image.shape[1] - margin*2) * random.random())) + margin - int(round(self.patch_dim/2.0))
+    patch_shuffle_order_label = int(math.floor((24 * random.random())))
 
-        random_patch_y_coord = uniform_patch_y_coord + patch_loc_arr[patch_direction_label][0] * (self.patch_dim + self.gap) + patch_jitter_y
-        random_patch_x_coord = uniform_patch_x_coord + patch_loc_arr[patch_direction_label][1] * (self.patch_dim + self.gap) + patch_jitter_x
+    patch_coords = [pc for _,pc in sorted(zip(patch_order_arr[patch_shuffle_order_label],patch_coords))]
 
-        if random_patch_y_coord >= 0 and random_patch_x_coord >= 0 and random_patch_y_coord < (image.shape[0] - patch_dim) and random_patch_x_coord < (image.shape[1] - patch_dim):
-            break
+    patch_a = image[patch_coords[0][0]:patch_coords[0][0]+self.patch_dim, patch_coords[0][1]:patch_coords[0][1]+self.patch_dim]
+    patch_b = image[patch_coords[1][0]:patch_coords[1][0]+self.patch_dim, patch_coords[1][1]:patch_coords[1][1]+self.patch_dim]
+    patch_c = image[patch_coords[2][0]:patch_coords[2][0]+self.patch_dim, patch_coords[2][1]:patch_coords[2][1]+self.patch_dim]
+    patch_d = image[patch_coords[3][0]:patch_coords[3][0]+self.patch_dim, patch_coords[3][1]:patch_coords[3][1]+self.patch_dim]
 
-    uniform_patch = image[uniform_patch_y_coord:uniform_patch_y_coord+self.patch_dim, uniform_patch_x_coord:uniform_patch_x_coord+self.patch_dim]        
-    random_patch = image[random_patch_y_coord:random_patch_y_coord+self.patch_dim, random_patch_x_coord:random_patch_x_coord+self.patch_dim]
-        
-    self.prep_patch(uniform_patch)
-    self.prep_patch(random_patch)
+    self.prep_patch(patch_a)
+    self.prep_patch(patch_b)
+    self.prep_patch(patch_c)
+    self.prep_patch(patch_d)
 
-    patch_direction_label = np.array(patch_direction_label).astype(np.int64)
+    patch_shuffle_order_label = np.array(patch_shuffle_order_label).astype(np.int64)
         
     if self.transform:
-      uniform_patch = self.transform(uniform_patch)
-      random_patch = self.transform(random_patch)
+      patch_a = self.transform(patch_a)
+      patch_b = self.transform(patch_b)
+      patch_c = self.transform(patch_c)
+      patch_d = self.transform(patch_d)
 
-    return uniform_patch, random_patch, patch_direction_label
+    return patch_a, patch_b, patch_c, patch_d, patch_shuffle_order_label
 
 
 
@@ -288,26 +334,28 @@ class AlexNetwork(nn.Module):
       )
 
       self.fc = nn.Sequential(
-        nn.Linear(2*4096, 4096),
+        nn.Linear(4*4096, 4096),
         nn.ReLU(True),
         nn.Dropout(),
-        nn.Linear(4096, 8),
+        nn.Linear(4096, 24),
       )
 
   def forward_once(self, x):
     output= self.cnn(x)
-    #print('a', output.size())
     output = output.view(output.size()[0], -1)
-    #print('b', output.size())
     output = self.fc6(output)
     return output
 
-  def forward(self, uniform_patch, random_patch):
-    output_fc6_uniform = self.forward_once(uniform_patch)
-    output_fc6_random = self.forward_once(random_patch)
-    output = torch.cat((output_fc6_uniform,output_fc6_random), 1)
+  def forward(self, patch_a, patch_b, patch_c, patch_d):
+    output_fc6_patch_a = self.forward_once(patch_a)
+    output_fc6_patch_b = self.forward_once(patch_b)
+    output_fc6_patch_c = self.forward_once(patch_c)
+    output_fc6_patch_d = self.forward_once(patch_d)
+
+    output = torch.cat((output_fc6_patch_a, output_fc6_patch_b, output_fc6_patch_c, output_fc6_patch_d), 1)
     output = self.fc(output)
-    return output, output_fc6_uniform, output_fc6_random
+
+    return output, output_fc6_patch_a, output_fc6_patch_b, output_fc6_patch_c, output_fc6_patch_d
 
 model = AlexNetwork().to(device)
 summary(model, [(3, 96, 96), (3, 96, 96)])
@@ -376,11 +424,11 @@ for epoch in range(last_epoch+1, num_epochs):
     start_time = time.time()
     model.train()
     for idx, data in tqdm(enumerate(trainloader), total=int(len(traindataset)/train_batch_size)):
-        uniform_patch, random_patch, random_patch_label = data[0].to(device), data[1].to(device), data[2].to(device)
+        patch_a, patch_b, patch_c, patch_d, patch_shuffle_order_label = data[0].to(device), data[1].to(device), data[2].to(device)
         # print(uniform_patch.size(), random_patch.size())
         optimizer.zero_grad()
-        output, output_fc6_uniform, output_fc6_random = model(uniform_patch, random_patch)
-        loss = criterion(output, random_patch_label)
+        output, output_fc6_patch_a, output_fc6_patch_b, output_fc6_patch_c, output_fc6_patch_d = model(patch_a, patch_b, patch_c, patch_d)
+        loss = criterion(output, patch_shuffle_order_label)
         loss.backward()
         optimizer.step()
         
@@ -391,14 +439,14 @@ for epoch in range(last_epoch+1, num_epochs):
       model.eval()
       with torch.no_grad():
         for idx, data in tqdm(enumerate(valloader), total=int(len(valdataset)/validation_batch_size)):
-          uniform_patch, random_patch, random_patch_label = data[0].to(device), data[1].to(device), data[2].to(device)
-          output, output_fc6_uniform, output_fc6_random = model(uniform_patch, random_patch)
-          loss = criterion(output, random_patch_label)
+          patch_a, patch_b, patch_c, patch_d, patch_shuffle_order_label = data[0].to(device), data[1].to(device), data[2].to(device)
+          output, output_fc6_patch_a, output_fc6_patch_b, output_fc6_patch_c, output_fc6_patch_d = model(uniform_patch, random_patch)
+          loss = criterion(output, patch_shuffle_order_label)
           val_running_loss.append(loss.item())
         
           _, predicted = torch.max(output.data, 1)
-          total += random_patch_label.size(0)
-          correct += (predicted == random_patch_label).sum()
+          total += patch_shuffle_order_label.size(0)
+          correct += (predicted == patch_shuffle_order_label).sum()
         print('Val Progress --- total:{}, correct:{}'.format(total, correct.item()))
         print('Val Accuracy of the network on the test images: {}%'.format(100 * correct.item() / total))
 
