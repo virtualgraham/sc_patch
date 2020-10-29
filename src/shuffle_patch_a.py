@@ -50,7 +50,7 @@ validation_dataset_length = 2048
 gap = 48
 jitter = 7
 train_batch_size = 128
-validation_batch_size = 64
+validation_batch_size = 128
 num_epochs = 1500
 
 learn_rate = 0.001
@@ -386,7 +386,7 @@ global_val_loss = []
 
 last_epoch = -1
 
-training_image_paths = glob(f'model_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_*.pt')
+training_image_paths = glob(f'shuffle_patch_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_*.pt')
 
 if len(training_image_paths) > 0:
   training_image_paths.sort()  
@@ -420,7 +420,6 @@ for epoch in range(last_epoch+1, num_epochs):
     model.train()
     for idx, data in tqdm(enumerate(trainloader), total=int(len(traindataset)/train_batch_size)):
         patch_a, patch_b, patch_c, patch_d, patch_shuffle_order_label = data[0].to(device), data[1].to(device), data[2].to(device), data[3].to(device), data[4].to(device)
-        # print(uniform_patch.size(), random_patch.size())
         optimizer.zero_grad()
         output, output_fc6_patch_a, output_fc6_patch_b, output_fc6_patch_c, output_fc6_patch_d = model(patch_a, patch_b, patch_c, patch_d)
         loss = criterion(output, patch_shuffle_order_label)
@@ -435,7 +434,7 @@ for epoch in range(last_epoch+1, num_epochs):
       with torch.no_grad():
         for idx, data in tqdm(enumerate(valloader), total=int(len(valdataset)/validation_batch_size)):
           patch_a, patch_b, patch_c, patch_d, patch_shuffle_order_label = data[0].to(device), data[1].to(device), data[2].to(device), data[3].to(device), data[4].to(device)
-          output, output_fc6_patch_a, output_fc6_patch_b, output_fc6_patch_c, output_fc6_patch_d = model(uniform_patch, random_patch)
+          output, output_fc6_patch_a, output_fc6_patch_b, output_fc6_patch_c, output_fc6_patch_d = model(patch_a, patch_b, patch_c, patch_d)
           loss = criterion(output, patch_shuffle_order_label)
           val_running_loss.append(loss.item())
         
@@ -457,7 +456,7 @@ for epoch in range(last_epoch+1, num_epochs):
     if epoch % save_after_epochs == 0:
 
       # delete old images
-      training_image_paths = glob(f'model_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_*.pt')
+      training_image_paths = glob(f'shuffle_patch_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_*.pt')
       if len(training_image_paths) > 2:
         training_image_paths.sort()
         for i in range(len(training_image_paths)-2):
@@ -465,7 +464,7 @@ for epoch in range(last_epoch+1, num_epochs):
           os.remove(training_image_path)
 
       # save new image
-      model_save_path = f'model_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_{epoch:04d}.pt'
+      model_save_path = f'shuffle_patch_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_{epoch:04d}.pt'
       print('saving checkpoint', model_save_path)
       torch.save(
         {
