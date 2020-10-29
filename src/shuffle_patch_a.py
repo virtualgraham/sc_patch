@@ -49,8 +49,8 @@ train_dataset_length = 40192
 validation_dataset_length = 2048
 gap = 48
 jitter = 7
-train_batch_size = 256
-validation_batch_size = 128
+train_batch_size = 128
+validation_batch_size = 64
 num_epochs = 1500
 
 learn_rate = 0.001
