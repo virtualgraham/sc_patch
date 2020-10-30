@@ -53,7 +53,7 @@ train_batch_size = 128
 validation_batch_size = 128
 num_epochs = 1500
 
-learn_rate = 0.0000625
+learn_rate = 0.00000625
 momentum = 0.974
 weight_decay = 0.0005
 
