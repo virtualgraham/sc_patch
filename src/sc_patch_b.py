@@ -45,8 +45,8 @@ print(device)
 training_image_paths = glob('Objects365/train/*.jpg')
 validation_image_paths = glob('Objects365/val/*.jpg')
 patch_dim = 96
-train_dataset_length = 40000 # 40192
-validation_dataset_length = 2000 # 2048
+train_dataset_length = 40192 # 40192
+validation_dataset_length = 2048 # 2048
 gap = 48
 jitter = 7
 train_batch_size = 256
@@ -422,7 +422,7 @@ for epoch in range(last_epoch+1, num_epochs):
           os.remove(training_image_path)
 
       # save new image
-      model_save_path = f'model_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_{epoch:04d}.pt'
+      model_save_path = f'model_b_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_{epoch:04d}.pt'
       print('saving checkpoint', model_save_path)
       torch.save(
         {

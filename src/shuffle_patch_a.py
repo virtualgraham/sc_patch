@@ -53,9 +53,9 @@ train_batch_size = 128
 validation_batch_size = 128
 num_epochs = 1500
 
-learn_rate = 0.0001
+learn_rate = 0.0000625
 momentum = 0.974
-weight_decay = 0
+weight_decay = 0.0005
 
 save_after_epochs = 1 
 
@@ -265,63 +265,63 @@ class AlexNetwork(nn.Module):
 
       self.cnn = nn.Sequential(
         nn.Conv2d(3, 64, kernel_size=3, padding=1),
-        nn.BatchNorm2d(64), 
+        # nn.BatchNorm2d(64), 
         nn.ReLU(inplace=True),
 
         nn.Conv2d(64, 64, kernel_size=3, padding=1),
-        nn.BatchNorm2d(64), 
+        # nn.BatchNorm2d(64), 
         nn.ReLU(inplace=True),
 
         nn.MaxPool2d(kernel_size=2, stride=2),
 
         nn.Conv2d(64, 128, kernel_size=3, padding=1),
-        nn.BatchNorm2d(128), 
+        # nn.BatchNorm2d(128), 
         nn.ReLU(inplace=True),
 
         nn.Conv2d(128, 128, kernel_size=3, padding=1),
-        nn.BatchNorm2d(128), 
+        # nn.BatchNorm2d(128), 
         nn.ReLU(inplace=True),
 
         nn.MaxPool2d(kernel_size=2, stride=2),
 
         nn.Conv2d(128, 256, kernel_size=3, padding=1),
-        nn.BatchNorm2d(256), 
+        # nn.BatchNorm2d(256), 
         nn.ReLU(inplace=True),
 
         nn.Conv2d(256, 256, kernel_size=3, padding=1),
-        nn.BatchNorm2d(256), 
+        # nn.BatchNorm2d(256), 
         nn.ReLU(inplace=True),
 
         nn.Conv2d(256, 256, kernel_size=3, padding=1),
-        nn.BatchNorm2d(256), 
+        # nn.BatchNorm2d(256), 
         nn.ReLU(inplace=True),
 
         nn.MaxPool2d(kernel_size=2, stride=2),
 
         nn.Conv2d(256, 512, kernel_size=3, padding=1),
-        nn.BatchNorm2d(512), 
+        # nn.BatchNorm2d(512), 
         nn.ReLU(inplace=True),
 
         nn.Conv2d(512, 512, kernel_size=3, padding=1),
-        nn.BatchNorm2d(512), 
+        # nn.BatchNorm2d(512), 
         nn.ReLU(inplace=True),
 
         nn.Conv2d(512, 512, kernel_size=3, padding=1),
-        nn.BatchNorm2d(512), 
+        # nn.BatchNorm2d(512), 
         nn.ReLU(inplace=True),
 
         nn.MaxPool2d(kernel_size=2, stride=2),
 
         nn.Conv2d(512, 512, kernel_size=3, padding=1),
-        nn.BatchNorm2d(512), 
+        # nn.BatchNorm2d(512), 
         nn.ReLU(inplace=True),
 
         nn.Conv2d(512, 512, kernel_size=3, padding=1),
-        nn.BatchNorm2d(512), 
+        # nn.BatchNorm2d(512), 
         nn.ReLU(inplace=True),
 
         nn.Conv2d(512, 512, kernel_size=3, padding=1),
-        nn.BatchNorm2d(512), 
+        # nn.BatchNorm2d(512), 
         nn.ReLU(inplace=True),
 
         nn.MaxPool2d(kernel_size=2, stride=2)
@@ -386,7 +386,7 @@ global_val_loss = []
 
 last_epoch = -1
 
-training_image_paths = glob(f'shuffle_patch_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_*.pt')
+training_image_paths = glob(f'shuffle_patch_b_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_*.pt')
 
 if len(training_image_paths) > 0:
   training_image_paths.sort()  
@@ -456,7 +456,7 @@ for epoch in range(last_epoch+1, num_epochs):
     if epoch % save_after_epochs == 0:
 
       # delete old images
-      training_image_paths = glob(f'shuffle_patch_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_*.pt')
+      training_image_paths = glob(f'shuffle_patch_b_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_*.pt')
       if len(training_image_paths) > 2:
         training_image_paths.sort()
         for i in range(len(training_image_paths)-2):
@@ -464,7 +464,7 @@ for epoch in range(last_epoch+1, num_epochs):
           os.remove(training_image_path)
 
       # save new image
-      model_save_path = f'shuffle_patch_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_{epoch:04d}.pt'
+      model_save_path = f'shuffle_patch_b_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_{epoch:04d}.pt'
       print('saving checkpoint', model_save_path)
       torch.save(
         {
