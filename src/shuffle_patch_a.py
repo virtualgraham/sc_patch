@@ -45,15 +45,15 @@ print(device)
 training_image_paths = glob('Objects365/train/*.jpg')
 validation_image_paths = glob('Objects365/val/*.jpg')
 patch_dim = 96
-train_dataset_length = 40192
-validation_dataset_length = 2048
+train_dataset_length = 40192 # 314 iterations
+validation_dataset_length = 2048 
 gap = 48
 jitter = 7
 train_batch_size = 128
 validation_batch_size = 128
 num_epochs = 1500
 
-learn_rate = 0.0000625
+learn_rate = 0.000625
 momentum = 0.974
 weight_decay = 0.0005
 
