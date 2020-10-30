@@ -53,7 +53,7 @@ train_batch_size = 256
 validation_batch_size = 128
 num_epochs = 1500
 
-learn_rate = 0.000625
+learn_rate = 0.0000625
 momentum = 0.974
 weight_decay = 0.0005
 
@@ -219,63 +219,63 @@ class AlexNetwork(nn.Module):
 
       self.cnn = nn.Sequential(
         nn.Conv2d(3, 64, kernel_size=3, padding=1),
-        # nn.BatchNorm2d(64), 
+        nn.BatchNorm2d(64), 
         nn.ReLU(inplace=True),
 
         nn.Conv2d(64, 64, kernel_size=3, padding=1),
-        # nn.BatchNorm2d(64), 
+        nn.BatchNorm2d(64), 
         nn.ReLU(inplace=True),
 
         nn.MaxPool2d(kernel_size=2, stride=2),
 
         nn.Conv2d(64, 128, kernel_size=3, padding=1),
-        # nn.BatchNorm2d(128), 
+        nn.BatchNorm2d(128), 
         nn.ReLU(inplace=True),
 
         nn.Conv2d(128, 128, kernel_size=3, padding=1),
-        # nn.BatchNorm2d(128), 
+        nn.BatchNorm2d(128), 
         nn.ReLU(inplace=True),
 
         nn.MaxPool2d(kernel_size=2, stride=2),
 
         nn.Conv2d(128, 256, kernel_size=3, padding=1),
-        # nn.BatchNorm2d(256), 
+        nn.BatchNorm2d(256), 
         nn.ReLU(inplace=True),
 
         nn.Conv2d(256, 256, kernel_size=3, padding=1),
-        # nn.BatchNorm2d(256), 
+        nn.BatchNorm2d(256), 
         nn.ReLU(inplace=True),
 
         nn.Conv2d(256, 256, kernel_size=3, padding=1),
-        # nn.BatchNorm2d(256), 
+        nn.BatchNorm2d(256), 
         nn.ReLU(inplace=True),
 
         nn.MaxPool2d(kernel_size=2, stride=2),
 
         nn.Conv2d(256, 512, kernel_size=3, padding=1),
-        # nn.BatchNorm2d(512), 
+        nn.BatchNorm2d(512), 
         nn.ReLU(inplace=True),
 
         nn.Conv2d(512, 512, kernel_size=3, padding=1),
-        # nn.BatchNorm2d(512), 
+        nn.BatchNorm2d(512), 
         nn.ReLU(inplace=True),
 
         nn.Conv2d(512, 512, kernel_size=3, padding=1),
-        # nn.BatchNorm2d(512), 
+        nn.BatchNorm2d(512), 
         nn.ReLU(inplace=True),
 
         nn.MaxPool2d(kernel_size=2, stride=2),
 
         nn.Conv2d(512, 512, kernel_size=3, padding=1),
-        # nn.BatchNorm2d(512), 
+        nn.BatchNorm2d(512), 
         nn.ReLU(inplace=True),
 
         nn.Conv2d(512, 512, kernel_size=3, padding=1),
-        # nn.BatchNorm2d(512), 
+        nn.BatchNorm2d(512), 
         nn.ReLU(inplace=True),
 
         nn.Conv2d(512, 512, kernel_size=3, padding=1),
-        # nn.BatchNorm2d(512), 
+        nn.BatchNorm2d(512), 
         nn.ReLU(inplace=True),
 
         nn.MaxPool2d(kernel_size=2, stride=2)
