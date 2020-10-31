@@ -51,6 +51,7 @@ train_batch_size = 128
 validation_batch_size = 128
 num_epochs = 1500
 save_after_epochs = 1 
+model_save_prefix = "shuffle_patch_o"
 
 patch_dim = 96
 gap = 32
@@ -391,7 +392,7 @@ global_val_loss = []
 
 last_epoch = -1
 
-training_image_paths = glob(f'shuffle_patch_o_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_*.pt')
+training_image_paths = glob(f'{model_save_prefix}_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_*.pt')
 
 if len(training_image_paths) > 0:
   training_image_paths.sort()  
@@ -461,7 +462,7 @@ for epoch in range(last_epoch+1, num_epochs):
     if epoch % save_after_epochs == 0:
 
       # delete old images
-      training_image_paths = glob(f'shuffle_patch_o_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_*.pt')
+      training_image_paths = glob(f'{model_save_prefix}_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_*.pt')
       if len(training_image_paths) > 2:
         training_image_paths.sort()
         for i in range(len(training_image_paths)-2):
@@ -469,7 +470,7 @@ for epoch in range(last_epoch+1, num_epochs):
           os.remove(training_image_path)
 
       # save new image
-      model_save_path = f'shuffle_patch_o_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_{epoch:04d}.pt'
+      model_save_path = f'{model_save_prefix}_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_{epoch:04d}.pt'
       print('saving checkpoint', model_save_path)
       torch.save(
         {
