@@ -53,7 +53,7 @@ train_batch_size = 128
 validation_batch_size = 128
 num_epochs = 1500
 
-learn_rate = 0.0000625
+learn_rate = 0.000625
 momentum = 0.974
 weight_decay = 0.0005
 
@@ -134,7 +134,8 @@ class MyDataset(Dataset):
     self.gap = gap
     self.jitter = jitter
     self.transform = transform
-    self.margin = math.ceil((2*patch_dim + 2*jitter + gap)/2)
+    self.color_shift = 2
+    self.margin = math.ceil((2*patch_dim + 2*jitter + 2*color_shift + gap)/2)
     self.min_width = 2 * self.margin + 1
 
   def __len__(self):
@@ -146,22 +147,29 @@ class MyDataset(Dataset):
   def random_jitter(self):
     return int(math.floor((self.jitter * 2 * random.random()))) - self.jitter
 
-  def prep_patch(self, image):
-    # print('prep_patch image.shape', image.shape)
-    # for some patches, randomly downsample to as little as 100 total pixels
-    if(random.random() < .33):
-      pil_patch = Image.fromarray(image)
-      original_size = pil_patch.size
-      randpix = int(math.sqrt(random.random() * (95 * 95 - 10 * 10) + 10 * 10))
-      pil_patch = pil_patch.resize((randpix, randpix)) 
-      pil_patch = pil_patch.resize(original_size) 
-      np.copyto(image, np.array(pil_patch))
+  def random_shift(self):
+    return random.randrange(self.color_shift * 2 + 1)
 
-    # randomly drop all but one color channel
-    chan_to_keep = random.randint(0, 2)
-    for i in range(0, 3):
-      if i != chan_to_keep:
-        image[:,:,i] = np.random.randint(0, 255, (self.patch_dim, self.patch_dim), dtype=np.uint8)
+  # crops the patch by self.color_shift on each side
+  def prep_patch(self, image):
+ 
+    cropped = np.empty((this.patch_dim, this.patch_dim, 3))
+
+    if(random.random() < .33):
+
+      pil_patch = Image.fromarray(image)
+      pil_patch = pil_patch.convert('L')
+      pil_patch = pil_patch.convert('RGB')
+      np.copyto(image, np.array(pil_patch)[self.color_shift:self.color_shift+self.patch_dim, self.color_shift:self.color_shift+self.patch_dim, :])
+      
+    else:
+
+      shift = [self.random_shift() for _ in range(6)]
+      cropped[:,:,0] = image[shift[0]:shift[0]+self.patch_dim, shift[1]:shift[1]+:this.patch_dim, 0]
+      cropped[:,:,1] = image[shift[2]:shift[2]+self.patch_dim, shift[3]:shift[3]+:this.patch_dim, 1]
+      cropped[:,:,2] = image[shift[4]:shift[4]+self.patch_dim, shift[5]:shift[5]+:this.patch_dim, 2]
+
+    return cropped
 
 
   def __getitem__(self, index):
@@ -190,20 +198,20 @@ class MyDataset(Dataset):
 
     patch_coords = [
       (
-        center_y_coord - (self.patch_dim + self.half_gap() + self.random_jitter()),
-        center_x_coord - (self.patch_dim + self.half_gap() + self.random_jitter())
+        center_y_coord - (self.patch_dim + self.half_gap() + self.random_jitter() + self.color_shift),
+        center_x_coord - (self.patch_dim + self.half_gap() + self.random_jitter() + self.color_shift)
       ),
       (
-        center_y_coord - (self.patch_dim + self.half_gap() + self.random_jitter()),
-        center_x_coord + self.half_gap()+ self.random_jitter()
+        center_y_coord - (self.patch_dim + self.half_gap() + self.random_jitter() + self.color_shift),
+        center_x_coord + self.half_gap() + self.random_jitter() - self.color_shift
       ),
       (
-        center_y_coord + self.half_gap() + self.random_jitter(),
-        center_x_coord - (self.patch_dim + self.half_gap() + self.random_jitter())
+        center_y_coord + self.half_gap() + self.random_jitter() - self.color_shift,
+        center_x_coord - (self.patch_dim + self.half_gap() + self.random_jitter() + self.color_shift)
       ),
       (
-        center_y_coord + self.half_gap() + self.random_jitter(),
-        center_x_coord + self.half_gap() + self.random_jitter()
+        center_y_coord + self.half_gap() + self.random_jitter() - self.color_shift,
+        center_x_coord + self.half_gap() + self.random_jitter() - self.color_shift
       )
     ]
     
@@ -211,15 +219,15 @@ class MyDataset(Dataset):
 
     patch_coords = [pc for _,pc in sorted(zip(patch_order_arr[patch_shuffle_order_label],patch_coords))]
 
-    patch_a = image[patch_coords[0][0]:patch_coords[0][0]+self.patch_dim, patch_coords[0][1]:patch_coords[0][1]+self.patch_dim]
-    patch_b = image[patch_coords[1][0]:patch_coords[1][0]+self.patch_dim, patch_coords[1][1]:patch_coords[1][1]+self.patch_dim]
-    patch_c = image[patch_coords[2][0]:patch_coords[2][0]+self.patch_dim, patch_coords[2][1]:patch_coords[2][1]+self.patch_dim]
-    patch_d = image[patch_coords[3][0]:patch_coords[3][0]+self.patch_dim, patch_coords[3][1]:patch_coords[3][1]+self.patch_dim]
+    patch_a = image[patch_coords[0][0]:patch_coords[0][0]+self.patch_dim+2*self.color_shift, patch_coords[0][1]:patch_coords[0][1]+self.patch_dim+2*self.color_shift]
+    patch_b = image[patch_coords[1][0]:patch_coords[1][0]+self.patch_dim+2*self.color_shift, patch_coords[1][1]:patch_coords[1][1]+self.patch_dim+2*self.color_shift]
+    patch_c = image[patch_coords[2][0]:patch_coords[2][0]+self.patch_dim+2*self.color_shift, patch_coords[2][1]:patch_coords[2][1]+self.patch_dim+2*self.color_shift]
+    patch_d = image[patch_coords[3][0]:patch_coords[3][0]+self.patch_dim+2*self.color_shift, patch_coords[3][1]:patch_coords[3][1]+self.patch_dim+2*self.color_shift]
 
-    self.prep_patch(patch_a)
-    self.prep_patch(patch_b)
-    self.prep_patch(patch_c)
-    self.prep_patch(patch_d)
+    patch_a = self.prep_patch(patch_a)
+    patch_b = self.prep_patch(patch_b)
+    patch_c = self.prep_patch(patch_c)
+    patch_d = self.prep_patch(patch_d)
 
     patch_shuffle_order_label = np.array(patch_shuffle_order_label).astype(np.int64)
         
