@@ -242,6 +242,7 @@ traindataset = MyDataset(training_image_paths, patch_dim, train_dataset_length, 
 
 trainloader = torch.utils.data.DataLoader(traindataset, 
                                           batch_size=train_batch_size,
+                                          num_workers=4,
                                           shuffle=False)
 
 
@@ -250,6 +251,7 @@ valdataset = MyDataset(validation_image_paths, patch_dim, validation_dataset_len
 
 valloader = torch.utils.data.DataLoader(valdataset,
                                         batch_size=validation_batch_size,
+                                        num_workers=4,
                                         shuffle=False)
 
 
