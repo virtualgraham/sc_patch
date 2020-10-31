@@ -6,6 +6,7 @@ Deep Learning Base AMI Ubuntu 18.04 m4a.xlarge us-west-2b
 
 sudo apt update
 sudo apt install unzip 
+
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip awscliv2.zip
 sudo ./aws/install
@@ -38,9 +39,10 @@ lsblk
 sudo mkdir /data
 
 ### ONLY TO INITIALIZE NEW DRIVE ### sudo mkfs -t xfs /dev/xvdf
+
 sudo mount /dev/nvme1n1 /data
 
-sudo chmod ugo+wx /data
+### ONLY TO INITIALIZE NEW DRIVE ### sudo chmod ugo+wx /data
 
 cd /data
 

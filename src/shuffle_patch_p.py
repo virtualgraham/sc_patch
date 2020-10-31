@@ -44,20 +44,22 @@ print(device)
 
 training_image_paths = glob('/data/open-images-dataset/train/*.jpg')
 validation_image_paths = glob('/data/open-images-dataset/validation/*.jpg')
-patch_dim = 96
+
 train_dataset_length = 40192 # 314 iterations
 validation_dataset_length = 2048 
-gap = 48
-jitter = 7
 train_batch_size = 128
 validation_batch_size = 128
 num_epochs = 1500
+save_after_epochs = 1 
+
+patch_dim = 96
+gap = 32
+jitter = 16
+gray_portion = .30
 
 learn_rate = 0.000625
 momentum = 0.974
 weight_decay = 0.0005
-
-save_after_epochs = 1 
 
 
 
@@ -125,7 +127,7 @@ patch_order_arr = [
   (3, 2, 1, 0)
 ]
 
-class MyDataset(Dataset):
+class ShufflePatchDataset(Dataset):
 
   def __init__(self, image_paths, patch_dim, length, gap, jitter, transform=None):
     self.image_paths = image_paths
@@ -135,7 +137,7 @@ class MyDataset(Dataset):
     self.jitter = jitter
     self.transform = transform
     self.color_shift = 2
-    self.margin = math.ceil((2*patch_dim + 2*jitter + 2*color_shift + gap)/2)
+    self.margin = math.ceil((2*patch_dim + 2*jitter + 2*self.color_shift + gap)/2)
     self.min_width = 2 * self.margin + 1
 
   def __len__(self):
@@ -151,23 +153,23 @@ class MyDataset(Dataset):
     return random.randrange(self.color_shift * 2 + 1)
 
   # crops the patch by self.color_shift on each side
-  def prep_patch(self, image):
+  def prep_patch(self, image, gray):
  
-    cropped = np.empty((this.patch_dim, this.patch_dim, 3))
+    cropped = np.empty((self.patch_dim, self.patch_dim, 3), dtype=np.uint8)
 
-    if(random.random() < .33):
+    if(gray):
 
       pil_patch = Image.fromarray(image)
       pil_patch = pil_patch.convert('L')
       pil_patch = pil_patch.convert('RGB')
-      np.copyto(image, np.array(pil_patch)[self.color_shift:self.color_shift+self.patch_dim, self.color_shift:self.color_shift+self.patch_dim, :])
+      np.copyto(cropped, np.array(pil_patch)[self.color_shift:self.color_shift+self.patch_dim, self.color_shift:self.color_shift+self.patch_dim, :])
       
     else:
 
       shift = [self.random_shift() for _ in range(6)]
-      cropped[:,:,0] = image[shift[0]:shift[0]+self.patch_dim, shift[1]:shift[1]+:this.patch_dim, 0]
-      cropped[:,:,1] = image[shift[2]:shift[2]+self.patch_dim, shift[3]:shift[3]+:this.patch_dim, 1]
-      cropped[:,:,2] = image[shift[4]:shift[4]+self.patch_dim, shift[5]:shift[5]+:this.patch_dim, 2]
+      cropped[:,:,0] = image[shift[0]:shift[0]+self.patch_dim, shift[1]:shift[1]+self.patch_dim, 0]
+      cropped[:,:,1] = image[shift[2]:shift[2]+self.patch_dim, shift[3]:shift[3]+self.patch_dim, 1]
+      cropped[:,:,2] = image[shift[4]:shift[4]+self.patch_dim, shift[5]:shift[5]+self.patch_dim, 2]
 
     return cropped
 
@@ -178,14 +180,6 @@ class MyDataset(Dataset):
     image_index = int(math.floor((len(self.image_paths) * random.random())))
     
     pil_image = Image.open(self.image_paths[image_index]).convert('RGB')
-
-    # Imagenet 150000 -> 180000 -> 450000
-    # 0.826 -> 2.479
-    # Objects365 300000 -> 370000 -> 925000
-
-    # original_size = pil_image.size
-    # randpix = int(math.sqrt(random.random() * (95 * 95 - 10 * 10) + 10 * 10))
-    # pil_image = pil_image.resize((randpix, randpix)) 
 
     image = np.array(pil_image)
 
@@ -224,10 +218,12 @@ class MyDataset(Dataset):
     patch_c = image[patch_coords[2][0]:patch_coords[2][0]+self.patch_dim+2*self.color_shift, patch_coords[2][1]:patch_coords[2][1]+self.patch_dim+2*self.color_shift]
     patch_d = image[patch_coords[3][0]:patch_coords[3][0]+self.patch_dim+2*self.color_shift, patch_coords[3][1]:patch_coords[3][1]+self.patch_dim+2*self.color_shift]
 
-    patch_a = self.prep_patch(patch_a)
-    patch_b = self.prep_patch(patch_b)
-    patch_c = self.prep_patch(patch_c)
-    patch_d = self.prep_patch(patch_d)
+    gray = random.random() < gray_portion
+
+    patch_a = self.prep_patch(patch_a, gray)
+    patch_b = self.prep_patch(patch_b, gray)
+    patch_c = self.prep_patch(patch_c, gray)
+    patch_d = self.prep_patch(patch_d, gray)
 
     patch_shuffle_order_label = np.array(patch_shuffle_order_label).astype(np.int64)
         
@@ -238,14 +234,13 @@ class MyDataset(Dataset):
       patch_d = self.transform(patch_d)
 
     return patch_a, patch_b, patch_c, patch_d, patch_shuffle_order_label
-
-
+    
 
 ##################################################
 # Creating Train/Validation dataset and dataloader
 ##################################################
 
-traindataset = MyDataset(training_image_paths, patch_dim, train_dataset_length, gap, jitter,
+traindataset = ShufflePatchDataset(training_image_paths, patch_dim, train_dataset_length, gap, jitter,
                          transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
 
 trainloader = torch.utils.data.DataLoader(traindataset, 
@@ -254,7 +249,7 @@ trainloader = torch.utils.data.DataLoader(traindataset,
                                           shuffle=False)
 
 
-valdataset = MyDataset(validation_image_paths, patch_dim, validation_dataset_length, gap, jitter,
+valdataset = ShufflePatchDataset(validation_image_paths, patch_dim, validation_dataset_length, gap, jitter,
                          transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
 
 valloader = torch.utils.data.DataLoader(valdataset,
@@ -268,10 +263,10 @@ valloader = torch.utils.data.DataLoader(valdataset,
 # Model for learning patch position
 ##################################################
 
-class AlexNetwork(nn.Module):
+class VggNetwork(nn.Module):
   def __init__(self,aux_logits = False):
 
-      super(AlexNetwork, self).__init__()
+      super(VggNetwork, self).__init__()
 
       self.cnn = nn.Sequential(
         nn.Conv2d(3, 64, kernel_size=3, padding=1),
@@ -367,7 +362,7 @@ class AlexNetwork(nn.Module):
 
     return output, output_fc6_patch_a, output_fc6_patch_b, output_fc6_patch_c, output_fc6_patch_d
 
-model = AlexNetwork().to(device)
+model = VggNetwork().to(device)
 summary(model, [(3, 96, 96), (3, 96, 96), (3, 96, 96), (3, 96, 96)])
 
 
