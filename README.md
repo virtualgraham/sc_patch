@@ -17,6 +17,6 @@ Main differences from original method in paper:
 
 ## `src/shuffle_patch_p.py`
 Method based on [Unsupervised Learning of Visual Representations by Solving Jigsaw Puzzles](https://arxiv.org/abs/1603.09246)
-- Used VGG16 instead of AlexNet
-- Uses the higher resolution open-image dataset
-- Uses 4 patches instead of 9, this has only 24 permutations so there in no need to sample from the complete set of permutations. Potentially having 4 patches and larger images could be better than 9 patches with smaller images. With the original method with 9 patches there is a hidden assumption that each image has a single subject. Most of the sample pictures have a cat or a car thats fills up the frame. The 9 patches are meant to represent parts of that single subject. This is not neccerilly the case in more complex scenes without well framed subjects. With 4 patches and larger images, the patches are all neighbors in a smaller region. So even if the image is composed of multiple objects, the relationships between adjacent parts will be better represented. 
+- Uses VGG16 instead of AlexNet
+- Uses the larger, higher resolution open-image dataset
+- Uses 4 patches instead of 9, this has only 24 permutations so there in no need to sample from the complete set of permutations. Potentially having 4 patches and larger images could be better than 9 patches with smaller images. With the original method with 9 patches there is a hidden assumption that each image has a single subject. Most of the sample pictures have a cat or a car thats fills up the frame. Even though this assumption is often false, the 9 patches are meant to represent parts of a single subject. This is not neccerilly the case in more complex scenes without well framed subjects. With 4 patches and larger images, the patches are all neighbors in a smaller region. So even if the image is composed of multiple objects, the relationships between adjacent parts may be better represented. 

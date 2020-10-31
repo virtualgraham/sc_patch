@@ -54,6 +54,10 @@ chmod +x start.sh
 pip3 install torch torchvision 
 pip3 install tqdm torchsummary
 
+## Set CUDA version ##
+sudo rm /usr/local/cuda
+sudo ln -s /usr/local/cuda-10.2 /usr/local/cuda
+
 detach data disk in console
 change to g4dn.xlarge
 
