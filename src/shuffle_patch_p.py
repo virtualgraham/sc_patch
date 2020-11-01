@@ -58,7 +58,7 @@ gap = 32
 jitter = 16
 gray_portion = .30
 
-learn_rate = 0.0000625
+learn_rate = 0.00003
 momentum = 0.974
 weight_decay = 0.0005
 
