@@ -58,7 +58,6 @@ patch_dim = 96
 gap = 32
 jitter = 16
 gray_portion = .30
-min_keypoints_per_patch = 4
 
 learn_rate = 0.0000625
 momentum = 0.974
@@ -142,7 +141,7 @@ class ShufflePatchDataset(Dataset):
     self.color_shift = 2
     self.margin = math.ceil((2*patch_dim + 2*jitter + 2*self.color_shift + gap)/2)
     self.min_width = 2 * self.margin + 1
-    self.orb = cv2.ORB_create(nfeatures=500, fastThreshold=7)
+    self.saliency = cv2.saliency.StaticSaliencyFineGrained_create()
 
   def __len__(self):
     return self.length
@@ -156,45 +155,41 @@ class ShufflePatchDataset(Dataset):
   def random_shift(self):
     return random.randrange(self.color_shift * 2 + 1)
 
-  def key_point_check(self, image, center_coord, patch_coords):
-    kp_margin = 32
-    window = image[max(0, center_coord[0]-self.margin-kp_margin):center_coord[0]+self.margin+kp_margin, max(0, center_coord[1]-self.margin-kp_margin):center_coord[1]+self.margin+kp_margin]
-    # print('window.shape', window.shape, center_coord[0]-self.margin-kp_margin, center_coord[0]+self.margin+kp_margin, center_coord[1]-self.margin-kp_margin, center_coord[1]+self.margin+kp_margin)
-    kp = self. orb.detect(cv2.cvtColor(window, cv2.COLOR_RGB2GRAY), None)
-    window_coord = (center_coord[0]-self.margin-kp_margin, center_coord[1]-self.margin-kp_margin)
-    kp_counts = [0,0,0,0]
-    for k in kp:
-        k_ = (window_coord[0]+k.pt[1],window_coord[1]+k.pt[0]) # the keypoint relative to the whole image
-        for index, patch_coord in enumerate(patch_coords):
-          if (  k_[0] >= patch_coord[0] and 
-                k_[0] < patch_coord[0]+self.patch_dim+2*self.color_shift and 
-                k_[1] >= patch_coord[1] and 
-                k_[1] < patch_coord[1]+self.patch_dim+2*self.color_shift ):  
-            kp_counts[index] += 1
+  def saliency_check(self, image, window_coord, patch_coords):
+    window = image[window_coord[0]:window_coord[0]+2*self.margin, window_coord[1]:window_coord[1]+2*self.margin]
+    (success, saliency_map) = self.saliency.computeSaliency(cv2.cvtColor(window, cv2.COLOR_RGB2BGR))
 
-    # print('kp_counts', kp_counts, )
-    return len([c for c in kp_counts if c > 5]) > 2
+    salient_patches = 0
+    for p in patch_coords:
+        patch_saliency_map = saliency_map[p[0]-window_coord[0]:p[0]-window_coord[0]+self.patch_dim, p[1]-window_coord[1]:p[1]-window_coord[1]+self.patch_dim]
+        patch_saliency = np.sum(patch_saliency_map > .50)
+        print('patch_saliency', patch_saliency)
+        if patch_saliency > 0:
+          salient_patches += 1
 
-  # crops the patch by self.color_shift on each side
-  def prep_patch(self, image, gray):
+    return True
+    return salient_patches > 2
+
+  # # crops the patch by self.color_shift on each side
+  # def prep_patch(self, image, gray):
  
-    cropped = np.empty((self.patch_dim, self.patch_dim, 3), dtype=np.uint8)
+  #   cropped = np.empty((self.patch_dim, self.patch_dim, 3), dtype=np.uint8)
 
-    if(gray):
+  #   if(gray):
 
-      pil_patch = Image.fromarray(image)
-      pil_patch = pil_patch.convert('L')
-      pil_patch = pil_patch.convert('RGB')
-      np.copyto(cropped, np.array(pil_patch)[self.color_shift:self.color_shift+self.patch_dim, self.color_shift:self.color_shift+self.patch_dim, :])
+  #     pil_patch = Image.fromarray(image)
+  #     pil_patch = pil_patch.convert('L')
+  #     pil_patch = pil_patch.convert('RGB')
+  #     np.copyto(cropped, np.array(pil_patch)[self.color_shift:self.color_shift+self.patch_dim, self.color_shift:self.color_shift+self.patch_dim, :])
       
-    else:
+  #   else:
 
-      shift = [self.random_shift() for _ in range(6)]
-      cropped[:,:,0] = image[shift[0]:shift[0]+self.patch_dim, shift[1]:shift[1]+self.patch_dim, 0]
-      cropped[:,:,1] = image[shift[2]:shift[2]+self.patch_dim, shift[3]:shift[3]+self.patch_dim, 1]
-      cropped[:,:,2] = image[shift[4]:shift[4]+self.patch_dim, shift[5]:shift[5]+self.patch_dim, 2]
+  #     shift = [self.random_shift() for _ in range(6)]
+  #     cropped[:,:,0] = image[shift[0]:shift[0]+self.patch_dim, shift[1]:shift[1]+self.patch_dim, 0]
+  #     cropped[:,:,1] = image[shift[2]:shift[2]+self.patch_dim, shift[3]:shift[3]+self.patch_dim, 1]
+  #     cropped[:,:,2] = image[shift[4]:shift[4]+self.patch_dim, shift[5]:shift[5]+self.patch_dim, 2]
 
-    return cropped
+  #   return cropped
 
 
   def __getitem__(self, index):
@@ -236,8 +231,8 @@ class ShufflePatchDataset(Dataset):
 
     patch_coords = [pc for _,pc in sorted(zip(patch_order_arr[patch_shuffle_order_label],patch_coords))]
 
-    if not self.key_point_check(image, (center_y_coord, center_x_coord), patch_coords):
-      print("not enough keypoints")
+    if not self.saliency_check(image, (center_y_coord - self.margin, center_x_coord - self.margin), patch_coords):
+      print("patches are not salient")
       return self.__getitem__(index)
 
     patch_a = image[patch_coords[0][0]:patch_coords[0][0]+self.patch_dim+2*self.color_shift, patch_coords[0][1]:patch_coords[0][1]+self.patch_dim+2*self.color_shift]
@@ -245,12 +240,10 @@ class ShufflePatchDataset(Dataset):
     patch_c = image[patch_coords[2][0]:patch_coords[2][0]+self.patch_dim+2*self.color_shift, patch_coords[2][1]:patch_coords[2][1]+self.patch_dim+2*self.color_shift]
     patch_d = image[patch_coords[3][0]:patch_coords[3][0]+self.patch_dim+2*self.color_shift, patch_coords[3][1]:patch_coords[3][1]+self.patch_dim+2*self.color_shift]
 
-    gray = random.random() < gray_portion
-
-    patch_a = self.prep_patch(patch_a, gray)
-    patch_b = self.prep_patch(patch_b, gray)
-    patch_c = self.prep_patch(patch_c, gray)
-    patch_d = self.prep_patch(patch_d, gray)
+    patch_a = patch_a[self.color_shift:self.color_shift+self.patch_dim, self.color_shift:self.color_shift+self.patch_dim, :]
+    patch_b = patch_b[self.color_shift:self.color_shift+self.patch_dim, self.color_shift:self.color_shift+self.patch_dim, :]
+    patch_c = patch_c[self.color_shift:self.color_shift+self.patch_dim, self.color_shift:self.color_shift+self.patch_dim, :]
+    patch_d = patch_d[self.color_shift:self.color_shift+self.patch_dim, self.color_shift:self.color_shift+self.patch_dim, :]
 
     patch_shuffle_order_label = np.array(patch_shuffle_order_label).astype(np.int64)
         
