@@ -446,6 +446,6 @@ for epoch in range(last_epoch+1, num_epochs):
     
       if epoch % backup_after_epochs == 0:
         print('backing up checkpoint', model_save_path)
-        os.system(f'aws s3 cp /data/{model_save_path} s3://guiuan/{model_save_prefix}_{epoch:04d}_{learn_rate}_{(100 * correct.item()/total):.2f}.pt')
+        os.system(f'aws s3 cp /data/{model_save_path} s3://guiuan/{model_save_prefix}_{epoch:04d}_{learn_rate}_{global_trn_loss[-1]:.4f}_{(100 * correct.item()/total):.2f}.pt')
 
 print("done")
