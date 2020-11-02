@@ -51,6 +51,7 @@ train_batch_size = 128
 validation_batch_size = 128
 num_epochs = 1500
 save_after_epochs = 1 
+backup_after_epochs = 10 
 model_save_prefix = "shuffle_patch_o"
 
 patch_dim = 96
@@ -481,7 +482,9 @@ for epoch in range(last_epoch+1, num_epochs):
             'global_trnloss': global_trn_loss,
             'global_valloss': global_val_loss
         }, model_save_path)
-
-
+    
+      if epoch % backup_after_epochs == 0:
+        print('backing up checkpoint', model_save_path)
+        os.system(f'aws s3 cp /data/{model_save_path} s3://guiuan')
 
 print("done")
