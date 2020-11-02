@@ -45,18 +45,20 @@ print(device)
 training_image_paths = glob('/data/open-images-dataset/train/*.jpg')
 validation_image_paths = glob('/data/open-images-dataset/validation/*.jpg')
 
+permutations = np.load("src/nine_patch/permutations_1000.npy")
+
 train_dataset_length = 40192 # 314 iterations
 validation_dataset_length = 2048 
-train_batch_size = 128
-validation_batch_size = 128
+train_batch_size = 256
+validation_batch_size = 256
 num_epochs = 1500
 save_after_epochs = 1 
 backup_after_epochs = 10 
 model_save_prefix = "nine_patch_a"
 permutation_count = 1000
 
-patch_dim = 96
-jitter = 16 # gap = t* jitter
+patch_dim = 64
+jitter = 11 # gap = t* jitter
 gray_portion = .30
 
 learn_rate = 0.001
@@ -102,8 +104,6 @@ unorm = UnNormalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
 # This class generates patches for training
 #########################################
 
-permutations = np.load("src/nine_patch/permutations_1000.npy")
-
 class ShufflePatchDataset(Dataset):
 
   def __init__(self, image_paths, patch_dim, length, jitter, transform=None):
@@ -118,7 +118,7 @@ class ShufflePatchDataset(Dataset):
     self.sub_window_width = self.patch_dim + 2*self.jitter + 2*self.color_shift
     self.window_width = 3*self.sub_window_width
     
-    self.min_image_width = window_width + 1
+    self.min_image_width = self.window_width + 1
 
   def __len__(self):
     return self.length
@@ -165,19 +165,19 @@ class ShufflePatchDataset(Dataset):
     if (image.shape[0] - self.min_image_width) <= 0 or (image.shape[1] - self.min_image_width) <= 0:
         return self.__getitem__(index)
     
-    window_y_coord = (image.shape[0] - self.window_width) * random.random()
-    window_x_coord = (image.shape[1] - self.window_width) * random.random()
+    window_y_coord = int(math.floor((image.shape[0] - self.window_width) * random.random()))
+    window_x_coord = int(math.floor((image.shape[1] - self.window_width) * random.random()))
 
     sub_window_coords = [
-      (window_y_coord, window_y_coord)
-      (window_y_coord, window_y_coord + self.sub_window_width)
-      (window_y_coord, window_y_coord + 2 * self.sub_window_width)
-      (window_y_coord + self.sub_window_width, window_y_coord)
-      (window_y_coord + self.sub_window_width, window_y_coord + self.sub_window_width)
-      (window_y_coord + self.sub_window_width, window_y_coord + 2 * self.sub_window_width)
-      (window_y_coord + 2 * self.sub_window_width, window_y_coord)
-      (window_y_coord + 2 * self.sub_window_width, window_y_coord + self.sub_window_width)
-      (window_y_coord + 2 * self.sub_window_width, window_y_coord + 2 * self.sub_window_width)
+      (window_y_coord, window_x_coord),
+      (window_y_coord, window_x_coord + self.sub_window_width),
+      (window_y_coord, window_x_coord + 2 * self.sub_window_width),
+      (window_y_coord + self.sub_window_width, window_x_coord),
+      (window_y_coord + self.sub_window_width, window_x_coord + self.sub_window_width),
+      (window_y_coord + self.sub_window_width, window_x_coord + 2 * self.sub_window_width),
+      (window_y_coord + 2 * self.sub_window_width, window_x_coord),
+      (window_y_coord + 2 * self.sub_window_width, window_x_coord + self.sub_window_width),
+      (window_y_coord + 2 * self.sub_window_width, window_x_coord + 2 * self.sub_window_width)
     ]
 
     # top left corner of each patch before shifting color channels and cropping
@@ -196,7 +196,8 @@ class ShufflePatchDataset(Dataset):
       patches = [self.transform(patch) for patch in patches]
 
     return patches, np.array(permutation_index).astype(np.int64)
-    
+
+
 
 ##################################################
 # Creating Train/Validation dataset and dataloader
@@ -295,16 +296,16 @@ class VggNetwork(nn.Module):
       )
     
       self.fc6 = nn.Sequential(
-        nn.Linear(512 * 3 * 3, 4096),
+        nn.Linear(512 * 2 * 2, 1024),
         nn.ReLU(True),
         nn.Dropout(),
       )
 
       self.fc = nn.Sequential(
-        nn.Linear(9*4096, 4096),
+        nn.Linear(9*1024, 4096),
         nn.ReLU(True),
         nn.Dropout(),
-        nn.Linear(4096, 24),
+        nn.Linear(4096, permutation_count),
       )
 
   def forward_once(self, x):
@@ -313,13 +314,13 @@ class VggNetwork(nn.Module):
     output = self.fc6(output)
     return output
 
-  def forward(self, patches):
-    output_fc6_patchs = [self.forward_once(patch) for patch in patches]
-    output = torch.cat(output_fc6_patchs, 1)
+  def forward(self, *patches):
+    output = torch.cat([self.forward_once(patch) for patch in patches], 1)
     return self.fc(output)
 
 model = VggNetwork().to(device)
 summary(model, [(3, patch_dim, patch_dim) for _ in range(9)])
+
 
 
 #############################################
@@ -379,13 +380,16 @@ for epoch in range(last_epoch+1, num_epochs):
     start_time = time.time()
     model.train()
     for idx, data in tqdm(enumerate(trainloader), total=int(len(traindataset)/train_batch_size)):
-        patch_a, patch_b, patch_c, patch_d, patch_shuffle_order_label = data[0].to(device), data[1].to(device), data[2].to(device), data[3].to(device), data[4].to(device)
+
+        patches = [d.to(device) for d in data[0:9]]
+        permutation_index = data[9].to(device)
+
         optimizer.zero_grad()
-        output, output_fc6_patch_a, output_fc6_patch_b, output_fc6_patch_c, output_fc6_patch_d = model(patch_a, patch_b, patch_c, patch_d)
-        loss = criterion(output, patch_shuffle_order_label)
+        output = model(patches...)
+        loss = criterion(output, permutation_index)
         loss.backward()
         optimizer.step()
-        
+
         train_running_loss.append(loss.item())
     else:
       correct = 0
@@ -393,14 +397,18 @@ for epoch in range(last_epoch+1, num_epochs):
       model.eval()
       with torch.no_grad():
         for idx, data in tqdm(enumerate(valloader), total=int(len(valdataset)/validation_batch_size)):
-          patch_a, patch_b, patch_c, patch_d, patch_shuffle_order_label = data[0].to(device), data[1].to(device), data[2].to(device), data[3].to(device), data[4].to(device)
-          output, output_fc6_patch_a, output_fc6_patch_b, output_fc6_patch_c, output_fc6_patch_d = model(patch_a, patch_b, patch_c, patch_d)
-          loss = criterion(output, patch_shuffle_order_label)
+
+          patches = [d.to(device) for d in data[0:9]]
+          permutation_index = data[9].to(device)
+
+          output = model(patches...)
+          loss = criterion(output, permutation_index)
           val_running_loss.append(loss.item())
         
           _, predicted = torch.max(output.data, 1)
           total += patch_shuffle_order_label.size(0)
           correct += (predicted == patch_shuffle_order_label).sum()
+
         print('Val Progress --- total:{}, correct:{}'.format(total, correct.item()))
         print('Val Accuracy of the network on the test images: {}%'.format(100 * correct.item() / total))
 
