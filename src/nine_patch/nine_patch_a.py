@@ -52,14 +52,14 @@ validation_batch_size = 128
 num_epochs = 1500
 save_after_epochs = 1 
 backup_after_epochs = 10 
-model_save_prefix = "shuffle_patch_o"
+model_save_prefix = "nine_patch_a"
+permutation_count = 1000
 
 patch_dim = 96
-gap = 32
-jitter = 16
+jitter = 16 # gap = t* jitter
 gray_portion = .30
 
-learn_rate = 0.00001
+learn_rate = 0.001
 momentum = 0.974
 weight_decay = 0.0005
 
@@ -102,66 +102,44 @@ unorm = UnNormalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
 # This class generates patches for training
 #########################################
 
-patch_order_arr = [
-  (0, 1, 2, 3),
-  (0, 1, 3, 2),
-  (0, 2, 1, 3),
-  (0, 2, 3, 1),
-  (0, 3, 1, 2),
-  (0, 3, 2, 1),
-  (1, 0, 2, 3),
-  (1, 0, 3, 2),
-  (1, 2, 0, 3),
-  (1, 2, 3, 0),
-  (1, 3, 0, 2),
-  (1, 3, 2, 0),
-  (2, 0, 1, 3),
-  (2, 0, 3, 1),
-  (2, 1, 0, 3),
-  (2, 1, 3, 0),
-  (2, 3, 0, 1),
-  (2, 3, 1, 0),
-  (3, 0, 1, 2),
-  (3, 0, 2, 1),
-  (3, 1, 0, 2),
-  (3, 1, 2, 0),
-  (3, 2, 0, 1),
-  (3, 2, 1, 0)
-]
+permutations = np.load("src/nine_patch/permutations_1000.npy")
 
 class ShufflePatchDataset(Dataset):
 
-  def __init__(self, image_paths, patch_dim, length, gap, jitter, transform=None):
+  def __init__(self, image_paths, patch_dim, length, jitter, transform=None):
     self.image_paths = image_paths
     self.patch_dim = patch_dim
     self.length = length
-    self.gap = gap
+    self.gap = 2*jitter
     self.jitter = jitter
-    self.transform = transform
     self.color_shift = 2
-    self.margin = math.ceil((2*patch_dim + 2*jitter + 2*self.color_shift + gap)/2)
-    self.min_width = 2 * self.margin + 1
+    self.transform = transform
+
+    self.sub_window_width = self.patch_dim + 2*self.jitter + 2*self.color_shift
+    self.window_width = 3*self.sub_window_width
+    
+    self.min_image_width = window_width + 1
 
   def __len__(self):
     return self.length
   
   def half_gap(self):
-    return math.ceil(self.gap/2)
+    return self.jitter
 
   def random_jitter(self):
-    return int(math.floor((self.jitter * 2 * random.random()))) - self.jitter
+    return int(math.floor(self.jitter * 2 * random.random()))
 
   def random_shift(self):
     return random.randrange(self.color_shift * 2 + 1)
 
   # crops the patch by self.color_shift on each side
-  def prep_patch(self, image, gray):
+  def prep_patch(self, sub_window, gray):
  
     cropped = np.empty((self.patch_dim, self.patch_dim, 3), dtype=np.uint8)
 
     if(gray):
 
-      pil_patch = Image.fromarray(image)
+      pil_patch = Image.fromarray(sub_window)
       pil_patch = pil_patch.convert('L')
       pil_patch = pil_patch.convert('RGB')
       np.copyto(cropped, np.array(pil_patch)[self.color_shift:self.color_shift+self.patch_dim, self.color_shift:self.color_shift+self.patch_dim, :])
@@ -169,9 +147,9 @@ class ShufflePatchDataset(Dataset):
     else:
 
       shift = [self.random_shift() for _ in range(6)]
-      cropped[:,:,0] = image[shift[0]:shift[0]+self.patch_dim, shift[1]:shift[1]+self.patch_dim, 0]
-      cropped[:,:,1] = image[shift[2]:shift[2]+self.patch_dim, shift[3]:shift[3]+self.patch_dim, 1]
-      cropped[:,:,2] = image[shift[4]:shift[4]+self.patch_dim, shift[5]:shift[5]+self.patch_dim, 2]
+      cropped[:,:,0] = sub_window[shift[0]:shift[0]+self.patch_dim, shift[1]:shift[1]+self.patch_dim, 0]
+      cropped[:,:,1] = sub_window[shift[2]:shift[2]+self.patch_dim, shift[3]:shift[3]+self.patch_dim, 1]
+      cropped[:,:,2] = sub_window[shift[4]:shift[4]+self.patch_dim, shift[5]:shift[5]+self.patch_dim, 2]
 
     return cropped
 
@@ -180,69 +158,51 @@ class ShufflePatchDataset(Dataset):
     # [y, x, chan], dtype=uint8, top_left is (0,0)
         
     image_index = int(math.floor((len(self.image_paths) * random.random())))
-    
     pil_image = Image.open(self.image_paths[image_index]).convert('RGB')
-
     image = np.array(pil_image)
 
     # If image is too small, try another image
-    if (image.shape[0] - self.min_width) <= 0 or (image.shape[1] - self.min_width) <= 0:
+    if (image.shape[0] - self.min_image_width) <= 0 or (image.shape[1] - self.min_image_width) <= 0:
         return self.__getitem__(index)
     
-    center_y_coord = int(math.floor((image.shape[0] - self.margin*2) * random.random())) + self.margin
-    center_x_coord = int(math.floor((image.shape[1] - self.margin*2) * random.random())) + self.margin
+    window_y_coord = (image.shape[0] - self.window_width) * random.random()
+    window_x_coord = (image.shape[1] - self.window_width) * random.random()
 
-    patch_coords = [
-      (
-        center_y_coord - (self.patch_dim + self.half_gap() + self.random_jitter() + self.color_shift),
-        center_x_coord - (self.patch_dim + self.half_gap() + self.random_jitter() + self.color_shift)
-      ),
-      (
-        center_y_coord - (self.patch_dim + self.half_gap() + self.random_jitter() + self.color_shift),
-        center_x_coord + self.half_gap() + self.random_jitter() - self.color_shift
-      ),
-      (
-        center_y_coord + self.half_gap() + self.random_jitter() - self.color_shift,
-        center_x_coord - (self.patch_dim + self.half_gap() + self.random_jitter() + self.color_shift)
-      ),
-      (
-        center_y_coord + self.half_gap() + self.random_jitter() - self.color_shift,
-        center_x_coord + self.half_gap() + self.random_jitter() - self.color_shift
-      )
+    sub_window_coords = [
+      (window_y_coord, window_y_coord)
+      (window_y_coord, window_y_coord + self.sub_window_width)
+      (window_y_coord, window_y_coord + 2 * self.sub_window_width)
+      (window_y_coord + self.sub_window_width, window_y_coord)
+      (window_y_coord + self.sub_window_width, window_y_coord + self.sub_window_width)
+      (window_y_coord + self.sub_window_width, window_y_coord + 2 * self.sub_window_width)
+      (window_y_coord + 2 * self.sub_window_width, window_y_coord)
+      (window_y_coord + 2 * self.sub_window_width, window_y_coord + self.sub_window_width)
+      (window_y_coord + 2 * self.sub_window_width, window_y_coord + 2 * self.sub_window_width)
     ]
+
+    # top left corner of each patch before shifting color channels and cropping
+    uncropped_patch_coords = [(y+self.random_jitter()+self.color_shift, x+self.random_jitter()+self.color_shift) for (y,x) in sub_window_coords]
     
-    patch_shuffle_order_label = int(math.floor((24 * random.random())))
+    permutation_index = int(math.floor((permutation_count * random.random())))
 
-    patch_coords = [pc for _,pc in sorted(zip(patch_order_arr[patch_shuffle_order_label],patch_coords))]
+    uncropped_patch_coords = [pc for _,pc in sorted(zip(permutations[permutation_index],uncropped_patch_coords))]
 
-    patch_a = image[patch_coords[0][0]:patch_coords[0][0]+self.patch_dim+2*self.color_shift, patch_coords[0][1]:patch_coords[0][1]+self.patch_dim+2*self.color_shift]
-    patch_b = image[patch_coords[1][0]:patch_coords[1][0]+self.patch_dim+2*self.color_shift, patch_coords[1][1]:patch_coords[1][1]+self.patch_dim+2*self.color_shift]
-    patch_c = image[patch_coords[2][0]:patch_coords[2][0]+self.patch_dim+2*self.color_shift, patch_coords[2][1]:patch_coords[2][1]+self.patch_dim+2*self.color_shift]
-    patch_d = image[patch_coords[3][0]:patch_coords[3][0]+self.patch_dim+2*self.color_shift, patch_coords[3][1]:patch_coords[3][1]+self.patch_dim+2*self.color_shift]
+    uncropped_patches = [image[y:y+self.patch_dim+2*self.color_shift, x:x+self.patch_dim+2*self.color_shift] for (y,x) in uncropped_patch_coords]
 
     gray = random.random() < gray_portion
+    patches = [self.prep_patch(patch, gray) for patch in uncropped_patches]
 
-    patch_a = self.prep_patch(patch_a, gray)
-    patch_b = self.prep_patch(patch_b, gray)
-    patch_c = self.prep_patch(patch_c, gray)
-    patch_d = self.prep_patch(patch_d, gray)
-
-    patch_shuffle_order_label = np.array(patch_shuffle_order_label).astype(np.int64)
-        
     if self.transform:
-      patch_a = self.transform(patch_a)
-      patch_b = self.transform(patch_b)
-      patch_c = self.transform(patch_c)
-      patch_d = self.transform(patch_d)
+      patches = [self.transform(patch) for patch in patches]
 
-    return patch_a, patch_b, patch_c, patch_d, patch_shuffle_order_label
+    return patches, np.array(permutation_index).astype(np.int64)
     
 
 ##################################################
 # Creating Train/Validation dataset and dataloader
 ##################################################
 
-traindataset = ShufflePatchDataset(training_image_paths, patch_dim, train_dataset_length, gap, jitter,
+traindataset = ShufflePatchDataset(training_image_paths, patch_dim, train_dataset_length, jitter,
                          transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
 
 trainloader = torch.utils.data.DataLoader(traindataset, 
@@ -251,7 +211,7 @@ trainloader = torch.utils.data.DataLoader(traindataset,
                                           shuffle=False)
 
 
-valdataset = ShufflePatchDataset(validation_image_paths, patch_dim, validation_dataset_length, gap, jitter,
+valdataset = ShufflePatchDataset(validation_image_paths, patch_dim, validation_dataset_length, jitter,
                          transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
 
 valloader = torch.utils.data.DataLoader(valdataset,
@@ -341,7 +301,7 @@ class VggNetwork(nn.Module):
       )
 
       self.fc = nn.Sequential(
-        nn.Linear(4*4096, 4096),
+        nn.Linear(9*4096, 4096),
         nn.ReLU(True),
         nn.Dropout(),
         nn.Linear(4096, 24),
@@ -353,20 +313,13 @@ class VggNetwork(nn.Module):
     output = self.fc6(output)
     return output
 
-  def forward(self, patch_a, patch_b, patch_c, patch_d):
-    output_fc6_patch_a = self.forward_once(patch_a)
-    output_fc6_patch_b = self.forward_once(patch_b)
-    output_fc6_patch_c = self.forward_once(patch_c)
-    output_fc6_patch_d = self.forward_once(patch_d)
-
-    output = torch.cat((output_fc6_patch_a, output_fc6_patch_b, output_fc6_patch_c, output_fc6_patch_d), 1)
-    output = self.fc(output)
-
-    return output, output_fc6_patch_a, output_fc6_patch_b, output_fc6_patch_c, output_fc6_patch_d
+  def forward(self, patches):
+    output_fc6_patchs = [self.forward_once(patch) for patch in patches]
+    output = torch.cat(output_fc6_patchs, 1)
+    return self.fc(output)
 
 model = VggNetwork().to(device)
-summary(model, [(3, 96, 96), (3, 96, 96), (3, 96, 96), (3, 96, 96)])
-
+summary(model, [(3, patch_dim, patch_dim) for _ in range(9)])
 
 
 #############################################
@@ -393,7 +346,7 @@ global_val_loss = []
 
 last_epoch = -1
 
-training_image_paths = glob(f'{model_save_prefix}_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_*.pt')
+training_image_paths = glob(f'{model_save_prefix}_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{2*jitter}_*.pt')
 
 if len(training_image_paths) > 0:
   training_image_paths.sort()  
@@ -463,7 +416,7 @@ for epoch in range(last_epoch+1, num_epochs):
     if epoch % save_after_epochs == 0:
 
       # delete old images
-      training_image_paths = glob(f'{model_save_prefix}_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_*.pt')
+      training_image_paths = glob(f'{model_save_prefix}_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{2*jitter}_*.pt')
       if len(training_image_paths) > 2:
         training_image_paths.sort()
         for i in range(len(training_image_paths)-2):
@@ -471,7 +424,7 @@ for epoch in range(last_epoch+1, num_epochs):
           os.remove(training_image_path)
 
       # save new image
-      model_save_path = f'{model_save_prefix}_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{gap}_{epoch:04d}.pt'
+      model_save_path = f'{model_save_prefix}_{train_batch_size}_{num_epochs}_{learn_rate}_{patch_dim}_{2*jitter}_{epoch:04d}.pt'
       print('saving checkpoint', model_save_path)
       torch.save(
         {
