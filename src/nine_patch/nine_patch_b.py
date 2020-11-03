@@ -61,7 +61,7 @@ patch_dim = 64
 jitter = 11
 gray_portion = .30
 
-learn_rate = 0.001
+learn_rate = 0.0001
 momentum = 0.974
 weight_decay = 0.0005
 
