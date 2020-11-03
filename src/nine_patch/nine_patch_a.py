@@ -406,8 +406,8 @@ for epoch in range(last_epoch+1, num_epochs):
           val_running_loss.append(loss.item())
         
           _, predicted = torch.max(output.data, 1)
-          total += patch_shuffle_order_label.size(0)
-          correct += (predicted == patch_shuffle_order_label).sum()
+          total += permutation_index.size(0)
+          correct += (predicted == permutation_index).sum()
 
         print('Val Progress --- total:{}, correct:{}'.format(total, correct.item()))
         print('Val Accuracy of the network on the test images: {}%'.format(100 * correct.item() / total))
