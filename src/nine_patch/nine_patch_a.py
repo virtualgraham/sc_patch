@@ -385,7 +385,7 @@ for epoch in range(last_epoch+1, num_epochs):
         permutation_index = data[9].to(device)
 
         optimizer.zero_grad()
-        output = model(*patches
+        output = model(*patches)
         loss = criterion(output, permutation_index)
         loss.backward()
         optimizer.step()
