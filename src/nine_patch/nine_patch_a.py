@@ -381,8 +381,8 @@ for epoch in range(last_epoch+1, num_epochs):
     model.train()
     for idx, data in tqdm(enumerate(trainloader), total=int(len(traindataset)/train_batch_size)):
 
-        patches = [d.to(device) for d in data[0:9]]
-        permutation_index = data[9].to(device)
+        patches = [d.to(device) for d in data[0]]
+        permutation_index = data[1].to(device)
 
         optimizer.zero_grad()
         output = model(*patches)
@@ -398,8 +398,8 @@ for epoch in range(last_epoch+1, num_epochs):
       with torch.no_grad():
         for idx, data in tqdm(enumerate(valloader), total=int(len(valdataset)/validation_batch_size)):
 
-          patches = [d.to(device) for d in data[0:9]]
-          permutation_index = data[9].to(device)
+          patches = [d.to(device) for d in data[0]]
+          permutation_index = data[1].to(device)
 
           output = model(*patches)
           loss = criterion(output, permutation_index)
