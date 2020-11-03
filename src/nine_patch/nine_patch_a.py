@@ -49,8 +49,8 @@ permutations = np.load("/data/sc_patch/src/nine_patch/permutations_1000.npy")
 
 train_dataset_length = 40192 # 314 iterations
 validation_dataset_length = 2048 
-train_batch_size = 128
-validation_batch_size = 128
+train_batch_size = 96
+validation_batch_size = 96
 num_epochs = 1500
 save_after_epochs = 1 
 backup_after_epochs = 10 
