@@ -49,16 +49,16 @@ permutations = np.load("src/nine_patch/permutations_1000.npy")
 
 train_dataset_length = 40192 # 314 iterations
 validation_dataset_length = 2048 
-train_batch_size = 256
-validation_batch_size = 256
+train_batch_size = 128
+validation_batch_size = 128
 num_epochs = 1500
 save_after_epochs = 1 
 backup_after_epochs = 10 
 model_save_prefix = "nine_patch_a"
 permutation_count = 1000
 
-patch_dim = 64
-jitter = 11 # gap = t* jitter
+patch_dim = 96
+jitter = 16
 gray_portion = .30
 
 learn_rate = 0.001
@@ -296,13 +296,13 @@ class VggNetwork(nn.Module):
       )
     
       self.fc6 = nn.Sequential(
-        nn.Linear(512 * 2 * 2, 1024),
+        nn.Linear(512 * 3 * 3, 2048),
         nn.ReLU(True),
         nn.Dropout(),
       )
 
       self.fc = nn.Sequential(
-        nn.Linear(9*1024, 4096),
+        nn.Linear(9*2048, 4096),
         nn.ReLU(True),
         nn.Dropout(),
         nn.Linear(4096, permutation_count),
@@ -385,7 +385,7 @@ for epoch in range(last_epoch+1, num_epochs):
         permutation_index = data[9].to(device)
 
         optimizer.zero_grad()
-        output = model(patches...)
+        output = model(*patches
         loss = criterion(output, permutation_index)
         loss.backward()
         optimizer.step()
@@ -401,7 +401,7 @@ for epoch in range(last_epoch+1, num_epochs):
           patches = [d.to(device) for d in data[0:9]]
           permutation_index = data[9].to(device)
 
-          output = model(patches...)
+          output = model(*patches)
           loss = criterion(output, permutation_index)
           val_running_loss.append(loss.item())
         
