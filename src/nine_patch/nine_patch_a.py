@@ -45,7 +45,7 @@ print(device)
 training_image_paths = glob('/data/open-images-dataset/train/*.jpg')
 validation_image_paths = glob('/data/open-images-dataset/validation/*.jpg')
 
-permutations = np.load("src/nine_patch/permutations_1000.npy")
+permutations = np.load("/data/sc_patch/src/nine_patch/permutations_1000.npy")
 
 train_dataset_length = 40192 # 314 iterations
 validation_dataset_length = 2048 
