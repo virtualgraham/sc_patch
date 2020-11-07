@@ -38,7 +38,7 @@ lsblk
 
 sudo mkdir /data
 
-### ONLY TO INITIALIZE NEW DRIVE ### sudo mkfs -t xfs /dev/xvdf
+### ONLY TO INITIALIZE NEW DRIVE ### sudo mkfs -t xfs /dev/nvme0n1
 
 sudo mount /dev/nvme1n1 /data
 
