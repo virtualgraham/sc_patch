@@ -408,6 +408,7 @@ if len(training_image_paths) > 0:
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     last_epoch = checkpoint['epoch']
+    scheduler = checkpoint['scheduler']
     loss = checkpoint['loss']
     global_trn_loss = checkpoint['global_trnloss']
     global_val_loss = checkpoint['global_valloss']
@@ -482,6 +483,7 @@ for epoch in range(last_epoch+1, num_epochs):
             'epoch': epoch,
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
+            'scheduler': scheduler,
             'loss': loss,
             'global_trnloss': global_trn_loss,
             'global_valloss': global_val_loss
