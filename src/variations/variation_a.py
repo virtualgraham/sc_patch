@@ -47,8 +47,8 @@ validation_image_paths = glob('/data/open-images-dataset/validation/*.jpg')
 
 train_dataset_length = 40192 # 314 iterations
 validation_dataset_length = 2048 
-train_batch_size = 128
-validation_batch_size = 128
+train_batch_size = 512
+validation_batch_size = 512
 num_epochs = 1500
 save_after_epochs = 1 
 backup_after_epochs = 10 
@@ -248,7 +248,7 @@ traindataset = ShufflePatchDataset(training_image_paths, patch_dim, train_datase
 
 trainloader = torch.utils.data.DataLoader(traindataset, 
                                           batch_size=train_batch_size,
-                                          num_workers=4,
+                                          num_workers=6,
                                           shuffle=False)
 
 
@@ -257,7 +257,7 @@ valdataset = ShufflePatchDataset(validation_image_paths, patch_dim, validation_d
 
 valloader = torch.utils.data.DataLoader(valdataset,
                                         batch_size=validation_batch_size,
-                                        num_workers=4,
+                                        num_workers=6,
                                         shuffle=False)
 
 
