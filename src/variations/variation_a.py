@@ -142,7 +142,7 @@ class ShufflePatchDataset(Dataset):
     self.color_shift = 2
     self.margin = math.ceil((2*patch_dim + 2*jitter + 2*self.color_shift + gap)/2)
     self.min_width = 2 * self.margin + 1
-    self.image_reused = reuse_image_count
+    self.image_reused = 0
 
   def __len__(self):
     return self.length
