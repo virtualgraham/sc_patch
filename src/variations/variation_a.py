@@ -53,6 +53,7 @@ num_epochs = 1500
 save_after_epochs = 1 
 backup_after_epochs = 10 
 model_save_prefix = "variation_a"
+reuse_image_count = 4
 
 patch_dim = 32
 gap = 10
@@ -141,6 +142,7 @@ class ShufflePatchDataset(Dataset):
     self.color_shift = 2
     self.margin = math.ceil((2*patch_dim + 2*jitter + 2*self.color_shift + gap)/2)
     self.min_width = 2 * self.margin + 1
+    self.image_reused = 0
 
   def __len__(self):
     return self.length
@@ -178,13 +180,17 @@ class ShufflePatchDataset(Dataset):
 
   def __getitem__(self, index):
     # [y, x, chan], dtype=uint8, top_left is (0,0)
-        
+    
     image_index = int(math.floor((len(self.image_paths) * random.random())))
     
-    pil_image = Image.open(self.image_paths[image_index]).convert('RGB')
-    pil_image = pil_image.resize((int(round(pil_image.size[0]/3)), int(round(pil_image.size[1]/3))))
+    if self.image_reused >= reuse_image_count:
+      pil_image = Image.open(self.image_paths[image_index]).convert('RGB')
+      self.pil_image = pil_image.resize((int(round(pil_image.size[0]/3)), int(round(pil_image.size[1]/3))))
+      self.image_reused = 0
+    else:
+      self.image_reused += 1
 
-    image = np.array(pil_image)
+    image = np.array(self.pil_image)
 
     # If image is too small, try another image
     if (image.shape[0] - self.min_width) <= 0 or (image.shape[1] - self.min_width) <= 0:
