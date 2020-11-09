@@ -53,7 +53,7 @@ num_epochs = 1500
 save_after_epochs = 1 
 backup_after_epochs = 10 
 model_save_prefix = "variation_a"
-reuse_image_count = 6
+reuse_image_count = 4
 
 patch_dim = 32
 gap = 10
