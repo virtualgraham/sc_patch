@@ -44,7 +44,7 @@ def key_point_grid(orb, frame, mask, grid_margin, stride):
         g = (int(math.floor((p[0]-grid_offset_x)/stride)), int(math.floor((p[1]-grid_offset_y)/stride)))
 
         ### TODO: implement if g in mask
-        if g in mask:
+        if True # g in mask:
             if g in grid:
                 grid[g].append(p)
             else:
@@ -79,21 +79,24 @@ def next_pos(kp_grid, shape, g_pos, walk_t, walk_length, stride):
     return loc, pos, False
 
 
-def search(files, db_path, mask_path, video_path, params):
+def search(image_files, mask_files, db_path, params):
     memory_graph = MemoryGraph(db_path, params)
+
     cnn = vgg16.VGG16(weights="imagenet", include_top=False, input_shape=(32, 32, 3))
     orb = cv2.ORB_create(nfeatures=100000, fastThreshold=7)
 
-    for file in files:
-        search_file(file, memory_graph, cnn, orb, mask_path, video_path, params)
+    return [search_file(image_file[i], mask_file[i], memory_graph, cnn, orb, params) for i in range(len(image_files))]
 
 
 ## get the k nearest neighbors for the given input image
-def search_file(image_file, mask, memory_graph, cnn, orb, params):
+def search_file(image_file, mask_file, memory_graph, cnn, orb, params):
     print("search", file)
 
     pil_image = Image.open(image_file).convert('RGB')
     image = np.array(pil_image)
+
+    pil_mask = Image.open(mask_file).convert('1')
+    mask = np.array(pil_mask)
 
     g_pos = [None for _ in range(params["search_walker_count"])]
     pos = [None for _ in range(params["search_walker_count"])]
@@ -103,6 +106,10 @@ def search_file(image_file, mask, memory_graph, cnn, orb, params):
     cluster_positions = [[] for _ in range(params["search_walker_count"])]
     cluster_patches = [[] for _ in range(params["search_walker_count"])]
 
+    image_shape = image.shape
+    kp_grid = key_point_grid(orb, image, mask, params["grid_margin"], params["stride"])
+
+
     observation_ids = set()
 
     done = False
@@ -111,12 +118,8 @@ def search_file(image_file, mask, memory_graph, cnn, orb, params):
         if t % params["search_walk_length"] == 0:
             print("frame", t)
 
-        video_shape = image.shape
-
-        kp_grid = key_point_grid(orb, image, mask, params["grid_margin"], params["stride"])
-
         for i in range(params["search_walker_count"]):
-            g_pos[i], pos[i], adj[i] = next_pos(kp_grid, video_shape, g_pos[i], walk_t[i], params["search_walk_length"], params["stride"])
+            g_pos[i], pos[i], adj[i] = next_pos(kp_grid, image_shape, g_pos[i], walk_t[i], params["search_walk_length"], params["stride"])
             if t == 0:
                 adj[i] = True
             if adj[i]:
@@ -131,11 +134,11 @@ def search_file(image_file, mask, memory_graph, cnn, orb, params):
         feats = cnn.predict(windows)
         feats = feats.reshape((windows.shape[0], 512))
         
-
         for i in range(params["search_walker_count"]):
             cluster_feats[i].append(feats[i])
             cluster_positions[i].append(pos[i])
             cluster_patches[i].append(patches[i])
+
 
         for i in range(params["search_walker_count"]):
             if (not adj[i] or done) and len(cluster_feats[i]) > 0:
@@ -155,71 +158,10 @@ def search_file(image_file, mask, memory_graph, cnn, orb, params):
         if done:
             break
 
+    print(image_file)
 
-
-    
-    print("")
-    print(datetime.now())
-    print(params)
-    print(object_name)
-    print("len(observations)", len(observations))
-    print("")
-
-
-
-files = [
-    '001_apple.mp4',
-    '002_apple.mp4',
-    '003_apple.mp4',
-    '004_bear.mp4',
-    '005_bear.mp4',
-    '006_bear.mp4',
-    '007_brush.mp4',
-    '008_brush.mp4',
-    '009_brush.mp4',
-    '010_carrot.mp4',
-    '011_carrot.mp4',
-    '012_carrot.mp4',
-    '013_chain.mp4',
-    '014_chain.mp4',
-    '015_chain.mp4',
-    '016_clippers.mp4',
-    '017_clippers.mp4',
-    '018_clippers.mp4',
-    '019_cologne.mp4',
-    '020_cologne.mp4',
-    '021_cologne.mp4',
-    '022_cup.mp4',
-    '023_cup.mp4',
-    '024_cup.mp4',
-    '025_flowers.mp4',
-    '026_flowers.mp4',
-    '027_flowers.mp4',
-    '028_hanger.mp4',
-    '029_hanger.mp4',
-    '030_hanger.mp4',
-    '031_ketchup.mp4',
-    '032_ketchup.mp4',
-    '033_ketchup.mp4',
-    '034_notebook.mp4',
-    '035_notebook.mp4',
-    '036_notebook.mp4',
-    '037_opener.mp4',
-    '038_opener.mp4',
-    '039_opener.mp4',
-    '040_pepper.mp4',
-    '041_pepper.mp4',
-    '042_pepper.mp4',
-    '043_rock.mp4',
-    '044_rock.mp4',
-    '045_rock.mp4',
-    '046_shorts.mp4',
-    '047_shorts.mp4',
-    '048_shorts.mp4',
-]
-
-mask_path = "../../media/tabletop_objects/masks/"
-video_path = "../../media/tabletop_objects/videos/"
+image_files = glob()
+mask_files = glob()
 db_path = "../../data/table_objects_j.db"
 
-search(files, db_path, mask_path, video_path, PARAMETERS)
+search(image_files, mask_files, db_path, PARAMETERS)

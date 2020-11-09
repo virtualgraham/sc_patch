@@ -764,6 +764,60 @@ class MemoryGraph:
         return observation_ids
 
 
+    # searches using the max pool of the provided feature cluster
+    def search_group_foo(self, features, params):
+        if len(features) == 0:
+            return set()
+
+        features_max = np.max(features, axis=0)
+        lab, dis = self.knn_query([features_max], k=params["search_knn"])
+
+        labels_merged = list(chain.from_iterable(lab))
+        distances_merged = list(chain.from_iterable(dis))
+
+        neighbor_nodes_merged = list(set([l for l,d in zip(labels_merged, distances_merged) if d <= params["feature_dis"]]))
+
+        results = set()
+
+        communities = self.get_communities(neighbor_nodes_merged, walk_length= params["initial_walk_length"], walk_trials=params["walk_trials"], member_portion=params["member_portion"])
+
+        for i in range(len(neighbor_nodes_merged)):
+            
+            walk_length =  params["initial_walk_length"]
+            last_community = frozenset()
+
+            while True: # 16 32 64 128 256 512 1024 2048 4096
+                if walk_length >= params["max_walk_length"]:
+                    break
+
+                if walk_length ==  params["initial_walk_length"]:
+                    community = frozenset(communities[i])
+                else:
+                    community = frozenset(self.get_communities([neighbor_nodes_merged[i]], walk_length=walk_length, walk_trials=params["walk_trials"], member_portion=params["member_portion"])[0])
+
+                if last_community == community:
+                    break
+
+                community_features_list = [i for i in [self.get_node(c)["f"] for c in community] if i is not None]
+                if len(community_features_list) == 0:
+                    break
+                community_features = np.array(community_features_list)
+                community_features_max = np.max(community_features, axis=0)
+                d = self.distance(community_features_max, features_max)
+                print(walk_length, d, len(community))
+
+                if d > params["community_dis"]:
+                    break
+
+                last_community = community
+                walk_length = walk_length * 2 
+
+            results.add(last_community)
+
+        return results
+
+
+    # this should find nearest groups and return them in the order of nearness
     def search_group(self, features, params):
         
         if len(features) == 0:
