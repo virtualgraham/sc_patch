@@ -182,7 +182,7 @@ class ShufflePatchDataset(Dataset):
     image_index = int(math.floor((len(self.image_paths) * random.random())))
     
     pil_image = Image.open(self.image_paths[image_index]).convert('RGB')
-    pil_image = pil_image.resize((int(math.round(pil_image.shape[0]/3)), int(math.round(pil_image.shape[1]/3))))
+    pil_image = pil_image.resize((int(round(pil_image.shape[0]/3)), int(round(pil_image.shape[1]/3))))
 
     image = np.array(pil_image)
 
