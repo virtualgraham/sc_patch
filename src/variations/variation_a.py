@@ -45,8 +45,8 @@ print(device)
 training_image_paths = glob('/data/open-images-dataset/train/*.jpg')
 validation_image_paths = glob('/data/open-images-dataset/validation/*.jpg')
 
-train_dataset_length = 40960 # 314 iterations
-validation_dataset_length = 2048 
+train_dataset_length = 409600
+validation_dataset_length = 20480
 train_batch_size = 1024
 validation_batch_size = 1024
 num_epochs = 1500
@@ -385,7 +385,7 @@ criterion = nn.CrossEntropyLoss()
 
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 
                                            mode='min',
-                                           patience=50,
+                                           patience=5,
                                            factor=0.5, verbose=True)
 
 #############################################
