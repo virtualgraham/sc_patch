@@ -383,7 +383,10 @@ optimizer = optim.SGD(
 
 criterion = nn.CrossEntropyLoss()
 
-
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 
+                                           mode='min',
+                                           patience=50,
+                                           factor=0.5, verbose=True)
 
 #############################################
 # Load Checkpoint
@@ -455,7 +458,7 @@ for epoch in range(last_epoch+1, num_epochs):
     global_trn_loss.append(sum(train_running_loss) / len(train_running_loss))
     global_val_loss.append(sum(val_running_loss) / len(val_running_loss))
 
-    # scheduler.step(global_val_loss[-1])
+    scheduler.step(global_val_loss[-1])
 
     print('Epoch [{}/{}], TRNLoss:{:.4f}, VALLoss:{:.4f}, Time:{:.2f}'.format(
         epoch + 1, num_epochs, global_trn_loss[-1], global_val_loss[-1],
