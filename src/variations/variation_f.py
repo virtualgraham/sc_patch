@@ -34,7 +34,7 @@ import os
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 
-# Rotation
+# Rotation, no jigsaw
 # Saliency Check
 # No color shift or grayscale conversion
 
@@ -52,12 +52,10 @@ validation_batch_size = 1024
 num_epochs = 1500
 save_after_epochs = 1 
 backup_after_epochs = 5 
-model_save_prefix = "variation_d"
+model_save_prefix = "variation_f"
 reuse_image_count = 4
 
-patch_dim = 32
-gap = 10
-jitter = 5
+patch_dim = 64
 
 learn_rate = 0.0001
 momentum = 0.974
@@ -102,47 +100,18 @@ unorm = UnNormalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
 # This class generates patches for training
 #########################################
 
-patch_order_arr = [
-  (0, 1, 2, 3),
-  (0, 1, 3, 2),
-  (0, 2, 1, 3),
-  (0, 2, 3, 1),
-  (0, 3, 1, 2),
-  (0, 3, 2, 1),
-  (1, 0, 2, 3),
-  (1, 0, 3, 2),
-  (1, 2, 0, 3),
-  (1, 2, 3, 0),
-  (1, 3, 0, 2),
-  (1, 3, 2, 0),
-  (2, 0, 1, 3),
-  (2, 0, 3, 1),
-  (2, 1, 0, 3),
-  (2, 1, 3, 0),
-  (2, 3, 0, 1),
-  (2, 3, 1, 0),
-  (3, 0, 1, 2),
-  (3, 0, 2, 1),
-  (3, 1, 0, 2),
-  (3, 1, 2, 0),
-  (3, 2, 0, 1),
-  (3, 2, 1, 0)
-]
-
 class ShufflePatchDataset(Dataset):
 
-  def __init__(self, image_paths, patch_dim, length, gap, jitter, transform=None):
+  def __init__(self, image_paths, patch_dim, length, transform=None):
     self.image_paths = image_paths
     self.patch_dim = patch_dim
     self.length = length
-    self.gap = gap
-    self.jitter = jitter
     self.transform = transform
     self.image_reused = 0
     
-    self.sub_window_width = self.patch_dim + 2*self.jitter
-    self.window_width = 2*self.sub_window_width
-    
+    self.margin = 10
+    self.window_width = self.patch_dim + 2*margin
+
     self.min_image_width = self.window_width + 1
 
     self.saliency = cv2.saliency.StaticSaliencyFineGrained_create()
@@ -150,28 +119,14 @@ class ShufflePatchDataset(Dataset):
   def __len__(self):
     return self.length
   
-  def half_gap(self):
-    return math.ceil(self.gap/2)
-
-  def random_jitter(self):
-    return int(math.floor((self.jitter * 2 * random.random()))) - self.jitter
-
-  def saliency_check(self, window, patch_coords):
+  def saliency_check(self, window):
     (success, saliency_map) = self.saliency.computeSaliency(cv2.cvtColor(window, cv2.COLOR_RGB2BGR))
 
-    high_saliency_patches = 0
-    med_saliency_patches = 0
-    for p in patch_coords:
-        patch_saliency_map = saliency_map[p[0]:p[0]+self.patch_dim, p[1]:p[1]+self.patch_dim]
-        patch_saliency = np.sum(patch_saliency_map > .5)
-        print('patch_saliency', patch_saliency)
-        if patch_saliency >= 500:
-          high_saliency_patches += 1
-        elif patch_saliency >= 100:
-          med_saliency_patches += 1
-
-    print('salient_patches', high_saliency_patches, med_saliency_patches, high_saliency_patches > 0 and (high_saliency_patches + med_saliency_patches) > 2)
-    return high_saliency_patches > 0 and (high_saliency_patches + med_saliency_patches) > 2
+    patch_saliency_map = saliency_map[self.margin:self.margin+self.patch_dim, self.margin:self.margin+self.patch_dim]
+    patch_saliency = np.sum(patch_saliency_map > .5)
+    print('patch_saliency', patch_saliency)
+    
+    return patch_saliency >= 700 # 700 + 100 + 100
 
 
   def __getitem__(self, index):
@@ -197,45 +152,27 @@ class ShufflePatchDataset(Dataset):
 
     window = image[window_y_coord:window_y_coord+self.window_width, window_x_coord:window_x_coord+self.window_width]
     
+    if not self.saliency_check(window):
+      return self.__getitem__(index)
+
     rotation_label = int(math.floor((4 * random.random())))
-    order_label = int(math.floor((24 * random.random()))) 
-    
+
     if rotation_label>0:
       window = np.rot90(window, rotation_label).copy()
 
-    patch_coords = [
-      (0, 0),
-      (0, self.sub_window_width),
-      (self.sub_window_width, 0),
-      (self.sub_window_width, self.sub_window_width),
-    ]
-
-    patch_coords = [pc for _,pc in sorted(zip(patch_order_arr[order_label],patch_coords))]
-
-    if not self.saliency_check(window, patch_coords):
-      return self.__getitem__(index)
-
-    patch_a = window[patch_coords[0][0]:patch_coords[0][0]+self.patch_dim, patch_coords[0][1]:patch_coords[0][1]+self.patch_dim]
-    patch_b = window[patch_coords[1][0]:patch_coords[1][0]+self.patch_dim, patch_coords[1][1]:patch_coords[1][1]+self.patch_dim]
-    patch_c = window[patch_coords[2][0]:patch_coords[2][0]+self.patch_dim, patch_coords[2][1]:patch_coords[2][1]+self.patch_dim]
-    patch_d = window[patch_coords[3][0]:patch_coords[3][0]+self.patch_dim, patch_coords[3][1]:patch_coords[3][1]+self.patch_dim]
-
-    combined_label = np.array(rotation_label * 24 + order_label).astype(np.int64)
+    patch = window[self.margin:self.margin+self.patch_dim, self.margin:self.margin+self.patch_dim]
         
     if self.transform:
-      patch_a = self.transform(patch_a)
-      patch_b = self.transform(patch_b)
-      patch_c = self.transform(patch_c)
-      patch_d = self.transform(patch_d)
+      patch = self.transform(patch)
 
-    return patch_a, patch_b, patch_c, patch_d, combined_label
+    return patch, np.array(rotation_label).astype(np.int64)
     
 
 ##################################################
 # Creating Train/Validation dataset and dataloader
 ##################################################
 
-traindataset = ShufflePatchDataset(training_image_paths, patch_dim, train_dataset_length, gap, jitter,
+traindataset = ShufflePatchDataset(training_image_paths, patch_dim, train_dataset_length
                          transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
 
 trainloader = torch.utils.data.DataLoader(traindataset, 
@@ -244,7 +181,7 @@ trainloader = torch.utils.data.DataLoader(traindataset,
                                           shuffle=False)
 
 
-valdataset = ShufflePatchDataset(validation_image_paths, patch_dim, validation_dataset_length, gap, jitter,
+valdataset = ShufflePatchDataset(validation_image_paths, patch_dim, validation_dataset_length
                          transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
 
 valloader = torch.utils.data.DataLoader(valdataset,
@@ -322,13 +259,13 @@ class VggNetwork(nn.Module):
       )
     
       self.fc6 = nn.Sequential(
-        nn.Linear(512, 1024),
+        nn.Linear(512 * 2 * 2, 4096),
         nn.ReLU(True),
         nn.Dropout(),
       )
 
       self.fc = nn.Sequential(
-        nn.Linear(4*1024, 4096),
+        nn.Linear(4096, 4096),
         nn.ReLU(True),
         nn.Dropout(),
         nn.Linear(4096, 24),
@@ -340,19 +277,13 @@ class VggNetwork(nn.Module):
     output = self.fc6(output)
     return output
 
-  def forward(self, patch_a, patch_b, patch_c, patch_d):
-    output_fc6_patch_a = self.forward_once(patch_a)
-    output_fc6_patch_b = self.forward_once(patch_b)
-    output_fc6_patch_c = self.forward_once(patch_c)
-    output_fc6_patch_d = self.forward_once(patch_d)
-
-    output = torch.cat((output_fc6_patch_a, output_fc6_patch_b, output_fc6_patch_c, output_fc6_patch_d), 1)
-    output = self.fc(output)
-
-    return output, output_fc6_patch_a, output_fc6_patch_b, output_fc6_patch_c, output_fc6_patch_d
+  def forward(self, patch):
+    output_fc6_patch = self.forward_once(patch)
+    output = self.fc(output_fc6_patch)
+    return output, output_fc6_patch
 
 model = VggNetwork().to(device)
-summary(model, [(3, patch_dim, patch_dim), (3, patch_dim, patch_dim), (3, patch_dim, patch_dim), (3, patch_dim, patch_dim)])
+summary(model, [(3, patch_dim, patch_dim)])
 
 
 
@@ -417,9 +348,9 @@ for epoch in range(last_epoch+1, num_epochs):
     start_time = time.time()
     model.train()
     for idx, data in tqdm(enumerate(trainloader), total=int(len(traindataset)/train_batch_size)):
-        patch_a, patch_b, patch_c, patch_d, patch_shuffle_order_label = data[0].to(device), data[1].to(device), data[2].to(device), data[3].to(device), data[4].to(device)
+        patch, patch_shuffle_order_label = data[0].to(device), data[1].to(device)
         optimizer.zero_grad()
-        output, output_fc6_patch_a, output_fc6_patch_b, output_fc6_patch_c, output_fc6_patch_d = model(patch_a, patch_b, patch_c, patch_d)
+        output, output_fc6_patch = model(patch)
         loss = criterion(output, patch_shuffle_order_label)
         loss.backward()
         optimizer.step()
@@ -431,8 +362,8 @@ for epoch in range(last_epoch+1, num_epochs):
       model.eval()
       with torch.no_grad():
         for idx, data in tqdm(enumerate(valloader), total=int(len(valdataset)/validation_batch_size)):
-          patch_a, patch_b, patch_c, patch_d, patch_shuffle_order_label = data[0].to(device), data[1].to(device), data[2].to(device), data[3].to(device), data[4].to(device)
-          output, output_fc6_patch_a, output_fc6_patch_b, output_fc6_patch_c, output_fc6_patch_d = model(patch_a, patch_b, patch_c, patch_d)
+          patch, patch_shuffle_order_label = data[0].to(device), data[1].to(device)
+          output, output_fc6_patch = model(patch)
           loss = criterion(output, patch_shuffle_order_label)
           val_running_loss.append(loss.item())
         

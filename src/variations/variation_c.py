@@ -51,7 +51,7 @@ validation_batch_size = 1024
 num_epochs = 1500
 save_after_epochs = 1 
 backup_after_epochs = 5 
-model_save_prefix = "variation_b"
+model_save_prefix = "variation_c"
 reuse_image_count = 4
 
 patch_dim = 32
