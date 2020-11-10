@@ -45,10 +45,10 @@ print(device)
 training_image_paths = glob('/data/open-images-dataset/train/*.jpg')
 validation_image_paths = glob('/data/open-images-dataset/validation/*.jpg')
 
-train_dataset_length = 408576
-validation_dataset_length = 19968
-train_batch_size = 1536
-validation_batch_size = 1536
+train_dataset_length = 409600
+validation_dataset_length = 20480
+train_batch_size = 1024
+validation_batch_size = 1024
 num_epochs = 1500
 save_after_epochs = 1 
 backup_after_epochs = 5 
@@ -336,16 +336,16 @@ class VggNetwork(nn.Module):
       )
     
       self.fc6 = nn.Sequential(
-        nn.Linear(512, 512),
+        nn.Linear(512, 1024),
         nn.ReLU(True),
         nn.Dropout(),
       )
 
       self.fc = nn.Sequential(
-        nn.Linear(4*512, 2048),
+        nn.Linear(4*1024, 4096),
         nn.ReLU(True),
         nn.Dropout(),
-        nn.Linear(2048, 24),
+        nn.Linear(4096, 24),
       )
 
   def forward_once(self, x):
