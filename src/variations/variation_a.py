@@ -47,17 +47,17 @@ validation_image_paths = glob('/data/open-images-dataset/validation/*.jpg')
 
 train_dataset_length = 409600
 validation_dataset_length = 20480
-train_batch_size = 256
-validation_batch_size = 256
+train_batch_size = 1024
+validation_batch_size = 1024
 num_epochs = 1500
 save_after_epochs = 1 
 backup_after_epochs = 5 
 model_save_prefix = "variation_a"
 reuse_image_count = 4
 
-patch_dim = 64
-gap = 22
-jitter = 11
+patch_dim = 32
+gap = 10
+jitter = 5
 gray_portion = .30
 
 learn_rate = 0.0001
@@ -336,7 +336,7 @@ class VggNetwork(nn.Module):
       )
     
       self.fc6 = nn.Sequential(
-        nn.Linear(512*2*2, 1024),
+        nn.Linear(512, 1024),
         nn.ReLU(True),
         nn.Dropout(),
       )
