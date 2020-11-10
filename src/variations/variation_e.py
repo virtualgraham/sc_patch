@@ -113,7 +113,8 @@ class ShufflePatchDataset(Dataset):
     self.gap = 2*jitter
     self.jitter = jitter
     self.transform = transform
-
+    self.image_reused = 0
+    
     self.sub_window_width = self.patch_dim + 2*self.jitter
     self.window_width = 3*self.sub_window_width
     

@@ -110,7 +110,7 @@ class ShufflePatchDataset(Dataset):
     self.image_reused = 0
     
     self.margin = 10
-    self.window_width = self.patch_dim + 2*margin
+    self.window_width = self.patch_dim + 2*self.margin
 
     self.min_image_width = self.window_width + 1
 
@@ -119,6 +119,7 @@ class ShufflePatchDataset(Dataset):
   def __len__(self):
     return self.length
   
+
   def saliency_check(self, window):
     (success, saliency_map) = self.saliency.computeSaliency(cv2.cvtColor(window, cv2.COLOR_RGB2BGR))
 
@@ -126,7 +127,7 @@ class ShufflePatchDataset(Dataset):
     patch_saliency = np.sum(patch_saliency_map > .5)
     print('patch_saliency', patch_saliency)
     
-    return patch_saliency >= 700 # 700 + 100 + 100
+    return patch_saliency >= 180 # 100 + 40 + 40
 
 
   def __getitem__(self, index):
