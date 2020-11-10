@@ -231,7 +231,8 @@ class ShufflePatchDataset(Dataset):
     
     patch_coords = [pc for _,pc in sorted(zip(patch_order_arr[order_label],patch_coords))]
 
-    self.saliency_check(window, patch_coords)
+    if not self.saliency_check(window, patch_coords):
+      return self.__getitem__(index)
 
     patch_a = window[patch_coords[0][0]:patch_coords[0][0]+self.patch_dim+2*self.color_shift, patch_coords[0][1]:patch_coords[0][1]+self.patch_dim+2*self.color_shift]
     patch_b = window[patch_coords[1][0]:patch_coords[1][0]+self.patch_dim+2*self.color_shift, patch_coords[1][1]:patch_coords[1][1]+self.patch_dim+2*self.color_shift]

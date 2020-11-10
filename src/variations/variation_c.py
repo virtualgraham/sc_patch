@@ -22,9 +22,7 @@ import time
 from tqdm import tqdm # progress bar
 
 import skimage
-from skimage import img_as_ubyte, img_as_float32
-
-from sklearn.model_selection import StratifiedShuffleSplit
+import cv2
 
 from glob import glob
 
@@ -36,7 +34,8 @@ import os
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 
-# Has color shift and grayscale conversion
+# Saliency Check
+# No color shift or grayscale conversion
 
 #########################################
 # Parameters 
@@ -52,14 +51,12 @@ validation_batch_size = 1024
 num_epochs = 1500
 save_after_epochs = 1 
 backup_after_epochs = 5 
-model_save_prefix = "variation_a"
+model_save_prefix = "variation_b"
 reuse_image_count = 4
-color_shift = 1 
 
 patch_dim = 32
 gap = 10
 jitter = 5
-gray_portion = .30
 
 learn_rate = 0.0001
 momentum = 0.974
@@ -140,10 +137,14 @@ class ShufflePatchDataset(Dataset):
     self.gap = gap
     self.jitter = jitter
     self.transform = transform
-    self.color_shift = color_shift
-    self.margin = math.ceil((2*self.patch_dim + 2*self.jitter + 2*self.color_shift + self.gap)/2)
-    self.min_width = 2 * self.margin + 1
     self.image_reused = 0
+    
+    self.sub_window_width = self.patch_dim + 2*self.jitter
+    self.window_width = 2*self.sub_window_width
+    
+    self.min_image_width = self.window_width + 1
+
+    self.saliency = cv2.saliency.StaticSaliencyFineGrained_create()
 
   def __len__(self):
     return self.length
@@ -154,29 +155,22 @@ class ShufflePatchDataset(Dataset):
   def random_jitter(self):
     return int(math.floor((self.jitter * 2 * random.random()))) - self.jitter
 
-  def random_shift(self):
-    return random.randrange(self.color_shift * 2 + 1)
+  def saliency_check(self, window, patch_coords):
+    (success, saliency_map) = self.saliency.computeSaliency(cv2.cvtColor(window, cv2.COLOR_RGB2BGR))
 
-  # crops the patch by self.color_shift on each side
-  def prep_patch(self, image, gray):
- 
-    cropped = np.empty((self.patch_dim, self.patch_dim, 3), dtype=np.uint8)
+    high_saliency_patches = 0
+    med_saliency_patches = 0
+    for p in patch_coords:
+        patch_saliency_map = saliency_map[p[0]:p[0]+self.patch_dim, p[1]:p[1]+self.patch_dim]
+        patch_saliency = np.sum(patch_saliency_map > .5)
+        print('patch_saliency', patch_saliency)
+        if patch_saliency >= 500:
+          high_saliency_patches += 1
+        elif patch_saliency >= 100:
+          med_saliency_patches += 1
 
-    if(gray):
-
-      pil_patch = Image.fromarray(image)
-      pil_patch = pil_patch.convert('L')
-      pil_patch = pil_patch.convert('RGB')
-      np.copyto(cropped, np.array(pil_patch)[self.color_shift:self.color_shift+self.patch_dim, self.color_shift:self.color_shift+self.patch_dim, :])
-      
-    else:
-
-      shift = [self.random_shift() for _ in range(6)]
-      cropped[:,:,0] = image[shift[0]:shift[0]+self.patch_dim, shift[1]:shift[1]+self.patch_dim, 0]
-      cropped[:,:,1] = image[shift[2]:shift[2]+self.patch_dim, shift[3]:shift[3]+self.patch_dim, 1]
-      cropped[:,:,2] = image[shift[4]:shift[4]+self.patch_dim, shift[5]:shift[5]+self.patch_dim, 2]
-
-    return cropped
+    print('salient_patches', high_saliency_patches, med_saliency_patches, high_saliency_patches > 0 and (high_saliency_patches + med_saliency_patches) > 2)
+    return high_saliency_patches > 0 and (high_saliency_patches + med_saliency_patches) > 2
 
 
   def __getitem__(self, index):
@@ -194,48 +188,33 @@ class ShufflePatchDataset(Dataset):
     image = np.array(self.pil_image)
 
     # If image is too small, try another image
-    if (image.shape[0] - self.min_width) <= 0 or (image.shape[1] - self.min_width) <= 0:
+    if (image.shape[0] - self.min_image_width) <= 0 or (image.shape[1] - self.min_image_width) <= 0:
         return self.__getitem__(index)
     
-    center_y_coord = int(math.floor((image.shape[0] - self.margin*2) * random.random())) + self.margin
-    center_x_coord = int(math.floor((image.shape[1] - self.margin*2) * random.random())) + self.margin
+    window_y_coord = int(math.floor((image.shape[0] - self.window_width) * random.random()))
+    window_x_coord = int(math.floor((image.shape[1] - self.window_width) * random.random()))
 
-    patch_coords = [
-      (
-        center_y_coord - (self.patch_dim + self.half_gap() + self.random_jitter() + self.color_shift),
-        center_x_coord - (self.patch_dim + self.half_gap() + self.random_jitter() + self.color_shift)
-      ),
-      (
-        center_y_coord - (self.patch_dim + self.half_gap() + self.random_jitter() + self.color_shift),
-        center_x_coord + self.half_gap() + self.random_jitter() - self.color_shift
-      ),
-      (
-        center_y_coord + self.half_gap() + self.random_jitter() - self.color_shift,
-        center_x_coord - (self.patch_dim + self.half_gap() + self.random_jitter() + self.color_shift)
-      ),
-      (
-        center_y_coord + self.half_gap() + self.random_jitter() - self.color_shift,
-        center_x_coord + self.half_gap() + self.random_jitter() - self.color_shift
-      )
-    ]
+    window = image[window_y_coord:window_y_coord+self.window_width, window_x_coord:window_x_coord+self.window_width]
+    order_label = int(math.floor((24 * random.random()))) 
     
-    patch_shuffle_order_label = int(math.floor((24 * random.random())))
+    patch_coords = [
+      (0, 0),
+      (0, self.sub_window_width),
+      (self.sub_window_width, 0),
+      (self.sub_window_width, self.sub_window_width),
+    ]
 
-    patch_coords = [pc for _,pc in sorted(zip(patch_order_arr[patch_shuffle_order_label],patch_coords))]
+    patch_coords = [pc for _,pc in sorted(zip(patch_order_arr[order_label],patch_coords))]
 
-    patch_a = image[patch_coords[0][0]:patch_coords[0][0]+self.patch_dim+2*self.color_shift, patch_coords[0][1]:patch_coords[0][1]+self.patch_dim+2*self.color_shift]
-    patch_b = image[patch_coords[1][0]:patch_coords[1][0]+self.patch_dim+2*self.color_shift, patch_coords[1][1]:patch_coords[1][1]+self.patch_dim+2*self.color_shift]
-    patch_c = image[patch_coords[2][0]:patch_coords[2][0]+self.patch_dim+2*self.color_shift, patch_coords[2][1]:patch_coords[2][1]+self.patch_dim+2*self.color_shift]
-    patch_d = image[patch_coords[3][0]:patch_coords[3][0]+self.patch_dim+2*self.color_shift, patch_coords[3][1]:patch_coords[3][1]+self.patch_dim+2*self.color_shift]
+    if not self.saliency_check(window, patch_coords):
+      return self.__getitem__(index)
 
-    gray = random.random() < gray_portion
+    patch_a = window[patch_coords[0][0]:patch_coords[0][0]+self.patch_dim, patch_coords[0][1]:patch_coords[0][1]+self.patch_dim]
+    patch_b = window[patch_coords[1][0]:patch_coords[1][0]+self.patch_dim, patch_coords[1][1]:patch_coords[1][1]+self.patch_dim]
+    patch_c = window[patch_coords[2][0]:patch_coords[2][0]+self.patch_dim, patch_coords[2][1]:patch_coords[2][1]+self.patch_dim]
+    patch_d = window[patch_coords[3][0]:patch_coords[3][0]+self.patch_dim, patch_coords[3][1]:patch_coords[3][1]+self.patch_dim]
 
-    patch_a = self.prep_patch(patch_a, gray)
-    patch_b = self.prep_patch(patch_b, gray)
-    patch_c = self.prep_patch(patch_c, gray)
-    patch_d = self.prep_patch(patch_d, gray)
-
-    patch_shuffle_order_label = np.array(patch_shuffle_order_label).astype(np.int64)
+    combined_label = np.array(order_label).astype(np.int64)
         
     if self.transform:
       patch_a = self.transform(patch_a)
@@ -243,7 +222,7 @@ class ShufflePatchDataset(Dataset):
       patch_c = self.transform(patch_c)
       patch_d = self.transform(patch_d)
 
-    return patch_a, patch_b, patch_c, patch_d, patch_shuffle_order_label
+    return patch_a, patch_b, patch_c, patch_d, combined_label
     
 
 ##################################################
