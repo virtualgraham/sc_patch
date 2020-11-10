@@ -366,7 +366,7 @@ class VggNetwork(nn.Module):
     return output, output_fc6_patch_a, output_fc6_patch_b, output_fc6_patch_c, output_fc6_patch_d
 
 model = VggNetwork().to(device)
-summary(model, [(3, 32, 32), (3, 32, 32), (3, 32, 32), (3, 32, 32)])
+summary(model, [(3, patch_dim, patch_dim), (3, patch_dim, patch_dim), (3, patch_dim, patch_dim), (3, patch_dim, patch_dim)])
 
 
 
