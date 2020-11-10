@@ -55,9 +55,9 @@ backup_after_epochs = 5
 model_save_prefix = "variation_a"
 reuse_image_count = 4
 
-patch_dim = 32
-gap = 10
-jitter = 5
+patch_dim = 64
+gap = 22
+jitter = 11
 gray_portion = .30
 
 learn_rate = 0.0001
@@ -336,16 +336,16 @@ class VggNetwork(nn.Module):
       )
     
       self.fc6 = nn.Sequential(
-        nn.Linear(512, 512),
+        nn.Linear(512*2*2, 1024),
         nn.ReLU(True),
         nn.Dropout(),
       )
 
       self.fc = nn.Sequential(
-        nn.Linear(4*512, 2048),
+        nn.Linear(4*1024, 4096),
         nn.ReLU(True),
         nn.Dropout(),
-        nn.Linear(2048, 24),
+        nn.Linear(4096, 24),
       )
 
   def forward_once(self, x):
