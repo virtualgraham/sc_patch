@@ -54,6 +54,7 @@ save_after_epochs = 1
 backup_after_epochs = 5 
 model_save_prefix = "variation_a"
 reuse_image_count = 4
+color_shift = 1 
 
 patch_dim = 32
 gap = 10
@@ -139,8 +140,8 @@ class ShufflePatchDataset(Dataset):
     self.gap = gap
     self.jitter = jitter
     self.transform = transform
-    self.color_shift = 2
-    self.margin = math.ceil((2*patch_dim + 2*jitter + 2*self.color_shift + gap)/2)
+    self.color_shift = color_shift
+    self.margin = math.ceil((2*self.patch_dim + 2*self.jitter + 2*self.color_shift + self.gap)/2)
     self.min_width = 2 * self.margin + 1
     self.image_reused = 0
 
