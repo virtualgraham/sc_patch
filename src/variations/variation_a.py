@@ -47,8 +47,8 @@ validation_image_paths = glob('/data/open-images-dataset/validation/*.jpg')
 
 train_dataset_length = 409600
 validation_dataset_length = 20480
-train_batch_size = 1024
-validation_batch_size = 1024
+train_batch_size = 512
+validation_batch_size = 512
 num_epochs = 1500
 save_after_epochs = 1 
 backup_after_epochs = 5 
