@@ -51,7 +51,7 @@ train_batch_size = 1024
 validation_batch_size = 1024
 num_epochs = 1500
 save_after_epochs = 1 
-backup_after_epochs = 10 
+backup_after_epochs = 5 
 model_save_prefix = "variation_a"
 reuse_image_count = 4
 
