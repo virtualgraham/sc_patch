@@ -422,10 +422,11 @@ if len(training_image_paths) > 0:
 # Training/Validation Engine
 ############################
 
-print("starting train loop (b.0)")
+print("starting train loop ....")
 
 for epoch in range(last_epoch+1, num_epochs):
     print("epoch", epoch)
+    print('lr', optimizer.param_groups[0]['lr'])
 
     train_running_loss = []
     val_running_loss = []
