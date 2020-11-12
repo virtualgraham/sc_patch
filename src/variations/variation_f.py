@@ -57,7 +57,7 @@ reuse_image_count = 4
 
 patch_dim = 64
 
-learn_rate = 0.0001
+learn_rate = 0.001
 momentum = 0.974
 weight_decay = 0.0005
 

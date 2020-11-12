@@ -61,7 +61,7 @@ permutation_count = 1000
 patch_dim = 32
 jitter = 5
 
-learn_rate = 0.0001
+learn_rate = 0.001
 momentum = 0.974
 weight_decay = 0.0005
 
