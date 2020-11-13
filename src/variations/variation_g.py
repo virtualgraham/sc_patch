@@ -53,14 +53,14 @@ validation_batch_size = 1024
 num_epochs = 1500
 save_after_epochs = 1 
 backup_after_epochs = 5 
-model_save_prefix = "variation_b"
+model_save_prefix = "variation_2g"
 reuse_image_count = 4
 
 patch_dim = 32
 gap = 10
 jitter = 5
 
-learn_rate = 0.0001
+learn_rate = 0.001
 momentum = 0.974
 weight_decay = 0.0005
 
@@ -254,9 +254,9 @@ class VggNetwork(nn.Module):
         nn.BatchNorm2d(64), 
         nn.ReLU(inplace=True),
 
-        nn.Conv2d(64, 64, kernel_size=3, padding=1),
-        nn.BatchNorm2d(64), 
-        nn.ReLU(inplace=True),
+        # nn.Conv2d(64, 64, kernel_size=3, padding=1),
+        # nn.BatchNorm2d(64), 
+        # nn.ReLU(inplace=True),
 
         nn.MaxPool2d(kernel_size=2, stride=2),
 
@@ -265,9 +265,9 @@ class VggNetwork(nn.Module):
         nn.BatchNorm2d(128), 
         nn.ReLU(inplace=True),
 
-        nn.Conv2d(128, 128, kernel_size=3, padding=1),
-        nn.BatchNorm2d(128), 
-        nn.ReLU(inplace=True),
+        # nn.Conv2d(128, 128, kernel_size=3, padding=1),
+        # nn.BatchNorm2d(128), 
+        # nn.ReLU(inplace=True),
 
         nn.MaxPool2d(kernel_size=2, stride=2),
 
@@ -307,16 +307,16 @@ class VggNetwork(nn.Module):
       )
     
       self.fc6 = nn.Sequential(
-        nn.Linear(512, 1024),
+        nn.Linear(512, 512),
         nn.ReLU(True),
         nn.Dropout(),
       )
 
       self.fc = nn.Sequential(
-        nn.Linear(4*1024, 4096),
+        nn.Linear(4*512, 2048),
         nn.ReLU(True),
         nn.Dropout(),
-        nn.Linear(4096, 24),
+        nn.Linear(2048, 24),
       )
 
   def forward_once(self, x):
