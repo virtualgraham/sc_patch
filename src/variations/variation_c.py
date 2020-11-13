@@ -153,7 +153,7 @@ class ShufflePatchDataset(Dataset):
     return math.ceil(self.gap/2)
 
   def random_jitter(self):
-    return int(math.floor((self.jitter * 2 * random.random()))) - self.jitter
+    return int(math.floor((self.jitter * 2 * random.random())))
 
   def saliency_check(self, window, patch_coords):
     (success, saliency_map) = self.saliency.computeSaliency(cv2.cvtColor(window, cv2.COLOR_RGB2BGR))
@@ -199,10 +199,10 @@ class ShufflePatchDataset(Dataset):
     order_label = int(math.floor((24 * random.random()))) 
     
     patch_coords = [
-      (0, 0),
-      (0, self.sub_window_width),
-      (self.sub_window_width, 0),
-      (self.sub_window_width, self.sub_window_width),
+      (self.random_jitter(), self.random_jitter(),
+      (self.random_jitter(), self.sub_window_width + self.random_jitter()),
+      (self.sub_window_width + self.random_jitter(), self.random_jitter()),
+      (self.sub_window_width + self.random_jitter(), self.sub_window_width + self.random_jitter()),
     ]
 
     patch_coords = [pc for _,pc in sorted(zip(patch_order_arr[order_label],patch_coords))]
