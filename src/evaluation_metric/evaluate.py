@@ -6,8 +6,11 @@ import math
 import re 
 from datetime import datetime
 
-from tensorflow.keras.applications import vgg16
-from tensorflow.keras.applications.vgg16 import preprocess_input
+
+from ShufflePatchModel import ShufflePatchFeatureExtractor
+
+# from tensorflow.keras.applications import vgg16
+# from tensorflow.keras.applications.vgg16 import preprocess_input
 
 from vgg16_window_walker_lib_images import color_fun, extract_windows, extract_window, extract_object, get_rad_grid, MemoryGraph, extract_window_pixels, PARAMETERS
 
@@ -82,7 +85,8 @@ def next_pos(kp_grid, shape, g_pos, walk_t, walk_length, stride):
 def search(image_files, mask_files, db_path, params):
     memory_graph = MemoryGraph(db_path, params)
 
-    cnn = vgg16.VGG16(weights="imagenet", include_top=False, input_shape=(32, 32, 3))
+    cnn = ShufflePatchFeatureExtractor("/Users/racoon/Desktop/variation_2b_migrated_0135_0.001_1.4328_63.80.pt")
+    # cnn = vgg16.VGG16(weights="imagenet", include_top=False, input_shape=(32, 32, 3))
     orb = cv2.ORB_create(nfeatures=100000, fastThreshold=7)
 
     return [search_file(image_file[i], mask_file[i], memory_graph, cnn, orb, params) for i in range(len(image_files))]
@@ -130,8 +134,11 @@ def search_file(image_file, mask_file, memory_graph, cnn, orb, params):
         patches = extract_windows(image, pos, params["window_size"])
         windows = patches.astype(np.float64)
 
-        preprocess_input(windows)
-        feats = cnn.predict(windows)
+        feats = cnn.evalRGB(windows)
+
+        # preprocess_input(windows)
+        # feats = cnn.predict(windows)
+
         feats = feats.reshape((windows.shape[0], 512))
         
         for i in range(params["search_walker_count"]):

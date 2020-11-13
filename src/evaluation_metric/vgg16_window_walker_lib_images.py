@@ -20,8 +20,9 @@ from PIL import Image
 
 import community_walk_graph as cwg
 
-from tensorflow.keras.applications import vgg16
-from tensorflow.keras.applications.vgg16 import preprocess_input
+from ShufflePatchModel import ShufflePatchFeatureExtractor
+# from tensorflow.keras.applications import vgg16
+# from tensorflow.keras.applications.vgg16 import preprocess_input
 
 class MemoryGraphWalker:
     def __init__(self, memory_graph, params):
@@ -1071,7 +1072,8 @@ def build_graph(db_path, image_files, params):
     orb = cv2.ORB_create(nfeatures=100000, fastThreshold=7)
 
     # initialize VGG16
-    model = vgg16.VGG16(weights="imagenet", include_top=False, input_shape=(32, 32, 3)) ### TODO: build interface so underlying model can be changed
+    model = ShufflePatchFeatureExtractor("/Users/racoon/Desktop/variation_2b_migrated_0135_0.001_1.4328_63.80.pt")
+    #model = vgg16.VGG16(weights="imagenet", include_top=False, input_shape=(32, 32, 3)) ### TODO: build interface so underlying model can be changed
 
     # memory graph
     memory_graph = MemoryGraph(db_path, params)
@@ -1113,8 +1115,10 @@ def build_graph(db_path, image_files, params):
                 windows = patches.astype(np.float64)
 
                 # extract cnn features from windows
-                preprocess_input(windows) ### TODO: these methods should be part of the model interface from above
-                feats = model.predict(windows)
+                # preprocess_input(windows) ### TODO: these methods should be part of the model interface from above
+                # feats = model.predict(windows)
+
+                feats = model.evalRGB(windows)
                 feats = feats.reshape((windows.shape[0], 512))
   
                 # objects = extract_objects(obj_frame, pos, params["center_size"])

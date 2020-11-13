@@ -3,3 +3,4 @@
 .ipynb_checkpoints
 dataset_100
 /data
+__pycache__
