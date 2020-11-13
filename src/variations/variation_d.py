@@ -149,9 +149,6 @@ class ShufflePatchDataset(Dataset):
 
   def __len__(self):
     return self.length
-  
-  def half_gap(self):
-    return math.ceil(self.gap/2)
 
   def random_jitter(self):
     return int(math.floor((self.jitter * 2 * random.random())))
@@ -161,17 +158,17 @@ class ShufflePatchDataset(Dataset):
 
     high_saliency_patches = 0
     med_saliency_patches = 0
+    
     for p in patch_coords:
         patch_saliency_map = saliency_map[p[0]:p[0]+self.patch_dim, p[1]:p[1]+self.patch_dim]
         patch_saliency = np.sum(patch_saliency_map > .5)
-        print('patch_saliency', patch_saliency)
         if patch_saliency >= 100:
           high_saliency_patches += 1
         elif patch_saliency >= 40:
           med_saliency_patches += 1
 
-    print('salient_patches', high_saliency_patches, med_saliency_patches, high_saliency_patches > 0 and (high_saliency_patches + med_saliency_patches) > 2)
     return high_saliency_patches > 0 and (high_saliency_patches + med_saliency_patches) > 2
+
 
   def __getitem__(self, index):
     # [y, x, chan], dtype=uint8, top_left is (0,0)
