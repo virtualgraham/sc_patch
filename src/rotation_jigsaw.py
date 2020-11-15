@@ -36,7 +36,7 @@ print(device)
 
 # Rotation
 # Saliency Check
-# No color shift or grayscale conversion
+# With color shift or grayscale conversion
 
 #########################################
 # Parameters 
@@ -57,6 +57,7 @@ color_shift = 1
 patch_dim = 96
 jitter = 16
 gray_portion = .30
+reuse_image_count = 4
 
 learn_rate = 0.001
 momentum = 0.974
@@ -104,7 +105,8 @@ class ShufflePatchDataset(Dataset):
     self.jitter = jitter
     self.color_shift = color_shift
     self.transform = transform
-    
+    self.image_reused = 0
+
     self.sub_window_width = self.patch_dim + 2*self.jitter + 2*self.color_shift
     self.window_width = 2*self.sub_window_width
     
@@ -163,8 +165,13 @@ class ShufflePatchDataset(Dataset):
     
     image_index = int(math.floor((len(self.image_paths) * random.random())))
     
-    pil_image = Image.open(self.image_paths[image_index]).convert('RGB')
-    image = np.array(pil_image)
+    if self.image_reused == 0:
+      self.pil_image = Image.open(self.image_paths[image_index]).convert('RGB')
+      self.image_reused = reuse_image_count - 1
+    else:
+      self.image_reused -= 1
+
+    image = np.array(self.pil_image)
 
     # If image is too small, try another image
     if (image.shape[0] - self.min_image_width) <= 0 or (image.shape[1] - self.min_image_width) <= 0:
