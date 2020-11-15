@@ -45,10 +45,10 @@ print(device)
 training_image_paths = glob('/data/open-images-dataset/train/*.jpg')
 validation_image_paths = glob('/data/open-images-dataset/validation/*.jpg')
 
-train_dataset_length = 40964
-validation_dataset_length = 3920
-train_batch_size = 196
-validation_batch_size = 196
+train_dataset_length = 40986
+validation_dataset_length = 4050
+train_batch_size = 162
+validation_batch_size = 162
 num_epochs = 3000
 save_after_epochs = 1 
 backup_after_epochs = 10 
