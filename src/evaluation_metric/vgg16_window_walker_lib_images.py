@@ -4,13 +4,10 @@ import time
 import struct
 import os.path
 from os import listdir
-from os.path import isfile, isdir, join, split, splitext
-import json
+from os.path import isfile, split, splitext
 from pathlib import Path
-import threading
-import re 
 from itertools import chain
-from collections import Counter
+
 
 import numpy as np
 import cv2
@@ -21,8 +18,7 @@ from PIL import Image
 import community_walk_graph as cwg
 
 from ShufflePatchModel import ShufflePatchFeatureExtractor
-# from tensorflow.keras.applications import vgg16
-# from tensorflow.keras.applications.vgg16 import preprocess_input
+
 
 class MemoryGraphWalker:
     def __init__(self, memory_graph, params):
@@ -71,7 +67,7 @@ class MemoryGraphWalker:
  
         stats = {"adj":adj}
 
-        tm = TimeMarker(enabled=self.keep_times)
+        # tm = TimeMarker(enabled=self.keep_times)
 
         if self.prevent_similar_adjacencies:
             if adj and walker_id in self.last_feats:
@@ -86,7 +82,7 @@ class MemoryGraphWalker:
         # if obj is not None: observation["o"] = obj
         observation_id = self.memory_graph.insert_observation(observation)
 
-        tm.mark(s="insert_observation")
+        # tm.mark(s="insert_observation")
 
         
         if len(distances) > 0 and distances[0] <= self.distance_threshold: 
@@ -101,7 +97,7 @@ class MemoryGraphWalker:
         if len(distances) > 0:
             stats["nearest_neighbor"] = distances[0]
 
-        tm.mark(l="find_correct_predictions", s="knn_query")
+        # tm.mark(l="find_correct_predictions", s="knn_query")
 
         accurate_predictions = set()
         skipped_accurate_predictions = set()
@@ -111,14 +107,14 @@ class MemoryGraphWalker:
 
         if adj and walker_id in self.history_nn and len(neighbor_nodes) > 0:
 
-            tm.mark(l="find_correct_predictions_inside")
+            # tm.mark(l="find_correct_predictions_inside")
 
             add_predicted_observations = set()
    
             ###################
             ###################
 
-            tm.mark(l="build_accurate_predictions_set")
+            # tm.mark(l="build_accurate_predictions_set")
             
             
 
@@ -153,23 +149,23 @@ class MemoryGraphWalker:
             
             stats["adjacencies_skipped"] = len(skipped_accurate_predictions)
 
-            tm.mark(si="build_accurate_predictions_set")
+            # tm.mark(si="build_accurate_predictions_set")
 
             ###################
             ###################
 
-            tm.mark(l="add_predicted_observations")
+            # tm.mark(l="add_predicted_observations")
 
             if len(add_predicted_observations) > 0:
                 self.memory_graph.add_predicted_observations(add_predicted_observations, [observation_id]*len(add_predicted_observations))
 
-            tm.mark(si="add_predicted_observations")
+            # tm.mark(si="add_predicted_observations")
 
             stats["accurate_predictions"] = len(accurate_predictions)
         
-            tm.mark(si="find_correct_predictions_inside")
+            # tm.mark(si="find_correct_predictions_inside")
 
-        tm.mark(si="find_correct_predictions")
+        # tm.mark(si="find_correct_predictions")
 
         if len(accurate_predictions) < self.accurate_prediction_limit:
 
@@ -199,7 +195,7 @@ class MemoryGraphWalker:
         else:
             node_id = None
 
-        tm.mark(s="insert_node_and_adjacencies")
+        # tm.mark(s="insert_node_and_adjacencies")
 
         #################
         # updating history
@@ -214,10 +210,10 @@ class MemoryGraphWalker:
             h.pop(0)
 
 
-        tm.mark(s="make_predictions")
+        # tm.mark(s="make_predictions")
 
-        if self.keep_times:
-            stats["time"] = tm.saved
+        # if self.keep_times:
+        #     stats["time"] = tm.saved
 
         self.last_ids[walker_id] = node_id
         self.last_feats[walker_id] = feats
@@ -229,7 +225,6 @@ class MemoryGraphWalker:
 
         
 MAX_KEY_VALUE = 18446744073709551615
-
 
 class MemoryGraph:
     #def __init__(self, path, space='cosine', dim=512, max_elements=1000000, ef=100, M=48, rebuild_index=False):
@@ -243,11 +238,11 @@ class MemoryGraph:
         self.open(params["rebuild_index"])
 
     def save(self):
-        print("Saving Index")
+        print("MemoryGraph: saving index")
         index_path = os.path.splitext(self.path)[0] + ".index"
-        print("index_path", index_path)
+        print("MemoryGraph: index path", index_path)
         self.index.save_index(index_path)
-        print("Index Saved")
+        print("MemoryGraph: index saved")
 
     def close(self):
         self.save()
@@ -262,7 +257,7 @@ class MemoryGraph:
         self.graph = cwg.new_graph()
 
         index_path = os.path.splitext(self.path)[0] + ".index"
-        print("index_path", index_path)
+        print("MemoryGraph: index path", index_path)
         self.index = hnswlib.Index(space=self.space, dim=self.dim) 
 
         if os.path.isfile(index_path) and not rebuild_index:
@@ -309,7 +304,7 @@ class MemoryGraph:
 
             n += 1
             if n % 1000 == 0:
-                print(n)
+                print("MemoryGraph: loading nodes", n)
                 self.index.add_items(feats, ids)
                 feats = []
                 ids = []
@@ -329,7 +324,9 @@ class MemoryGraph:
             cwg.add_edge(self.graph, from_node_id, to_node_id)
 
 
-    #######################################################
+    ######################
+    # IDs
+    ######################
 
     def generate_node_ids(self, count):
         return [self.generate_id(MemoryGraph.node_key) for _ in range(count)]
@@ -344,8 +341,6 @@ class MemoryGraph:
             if b is None:
                 return id
 
-    ######################################################
-
 
     ######################
     # NODES
@@ -358,7 +353,6 @@ class MemoryGraph:
     @staticmethod
     def numpy_from_bytes(b):
         return np.frombuffer(b, dtype=np.float32)
-
 
     @staticmethod
     def community_key(node_id, walk_length, walk_trials, member_portion):
@@ -438,14 +432,7 @@ class MemoryGraph:
     def write_node(self, node):
         self.db.put(MemoryGraph.node_key(node["id"]), MemoryGraph.encode_node(node))
 
-    def read_community(self, node_id, walk_length, walk_trials, member_portion):
-        b = self.db.get(MemoryGraph.community_key(node_id, walk_length, walk_trials, member_portion))
-        if b is None:
-            return None
-        return MemoryGraph.decode_community(b)
 
-    def write_community(self, node_id, walk_length, walk_trials, member_portion, community):
-        self.db.put(MemoryGraph.community_key(node_id, walk_length, walk_trials, member_portion), MemoryGraph.encode_community(community))
 
     ######################
     # EDGES
@@ -460,105 +447,6 @@ class MemoryGraph:
         wb = self.db.write_batch()
         for edge in edges:
             wb.put(MemoryGraph.edge_key(edge), b'')
-        wb.write()
-
-
-    ######################
-    # Counts
-    ######################
-
-    @staticmethod
-    def pixel_object_count_key(obj):
-        return b'c:p:' + obj.encode()
-
-    @staticmethod
-    def pixel_count_key():
-        return b'c:p'
-
-    @staticmethod
-    def frame_object_count_key(obj):
-        return b'c:f:' + obj.encode()
-
-    @staticmethod
-    def frame_count_key():
-        return b'c:f'
-
-    @staticmethod
-    def observation_object_count_key(obj):
-        return b'c:o:' + obj.encode()
-
-    @staticmethod
-    def observation_count_key():
-        return b'c:o'
-
-    @staticmethod
-    def video_object_count_key(obj):
-        return b'c:v:' + obj.encode()
-
-    @staticmethod
-    def video_count_key():
-        return b'c:v'
-
-    def increment_count_wb(self, wb, key, amount):
-        c = self.get_count(key)
-        wb.put(key, struct.pack('>Q', c + amount))
-
-    def get_count(self, key):
-        c = self.db.get(key)
-        if c is None:
-            return 0
-        else:
-            return struct.unpack_from('>Q', c)[0]
-
-    def get_counts(self):
-        observation_count = self.get_count(MemoryGraph.observation_count_key())
-        observation_objects = dict()
-        for k,v in self.db.iterator(start=b'c:o:', stop=b'c:o:~'):
-            observation_objects[k.decode().split(':')[2]] = struct.unpack_from('>Q', v)[0]
-
-        frame_count = self.get_count(MemoryGraph.frame_count_key())
-        frame_objects = dict()
-        for k,v in self.db.iterator(start=b'c:f:', stop=b'c:f:~'):
-            frame_objects[k.decode().split(':')[2]] = struct.unpack_from('>Q', v)[0]
-
-        video_count = self.get_count(MemoryGraph.video_count_key())
-        video_objects = dict()
-        for k,v in self.db.iterator(start=b'c:v:', stop=b'c:v:~'):
-            video_objects[k.decode().split(':')[2]] = struct.unpack_from('>Q', v)[0]
-
-        pixel_count = self.get_count(MemoryGraph.pixel_count_key())
-        pixel_objects = dict()
-        for k,v in self.db.iterator(start=b'c:p:', stop=b'c:p:~'):
-            pixel_objects[k.decode().split(':')[2]] = struct.unpack_from('>Q', v)[0]
-
-        return {
-            "observation_count": observation_count,
-            "observation_objects": observation_objects,
-            "frame_count": frame_count,
-            "frame_objects": frame_objects,
-            "video_count": video_count,
-            "video_objects": video_objects,
-            "pixel_count": pixel_count,
-            "pixel_objects": pixel_objects,
-        }
-
-
-    # objects: a set of object names
-    def increment_video_counts(self, objects):
-        wb = self.db.write_batch()
-        for obj in objects:
-            self.increment_count_wb(wb, MemoryGraph.video_object_count_key(obj), 1)
-        self.increment_count_wb(wb, MemoryGraph.video_count_key(), 1)
-        wb.write()
-
-    # object_pixels: a dict of object names -> pixels in object
-    def increment_frame_counts(self, pixels, object_pixels):
-        wb = self.db.write_batch()
-        for obj, pix in object_pixels.items():
-            self.increment_count_wb(wb, MemoryGraph.frame_object_count_key(obj), 1)
-            self.increment_count_wb(wb, MemoryGraph.pixel_object_count_key(obj), pix)
-        self.increment_count_wb(wb, MemoryGraph.frame_count_key(), 1)
-        self.increment_count_wb(wb, MemoryGraph.pixel_count_key(), pixels)
         wb.write()
 
 
@@ -626,9 +514,6 @@ class MemoryGraph:
     def get_observations(self, observation_ids):
         return [self.get_observation(observation_id) for observation_id in observation_ids]
 
-    # TODO: each observation should have a list of the objects that where in the frame
-    
-    # TODO: should be parallelizable safe (plyvel)
     def insert_observations(self, observations):
         observation_ids = self.generate_observation_ids(len(observations))
         wb = self.db.write_batch()
@@ -655,7 +540,7 @@ class MemoryGraph:
         stop = MemoryGraph.integrated_observations_key(node_id, MAX_KEY_VALUE)
         return [struct.unpack_from('>Q', b, offset=9)[0] for b in self.db.iterator(start=start, stop=stop, include_value=False)]
 
-    # TODO: should be parallelizable safe (plyvel)
+
     def add_integrated_observations(self, node_ids, observation_ids):
         wb = self.db.write_batch()
         for node_id, observation_id in zip(node_ids, observation_ids):
@@ -675,7 +560,7 @@ class MemoryGraph:
         stop = MemoryGraph.predicted_observations_key(node_id, MAX_KEY_VALUE)
         return [struct.unpack_from('>Q', b, offset=9)[0] for b in self.db.iterator(start=start, stop=stop, include_value=False)]
 
-    # TODO: should be parallelizable safe (plyvel)
+
     def add_predicted_observations(self, node_ids, observation_ids):
         wb = self.db.write_batch()
         for node_id, observation_id in zip(node_ids, observation_ids):
@@ -683,6 +568,14 @@ class MemoryGraph:
             wb.put(MemoryGraph.predicted_nodes_key(observation_id, node_id), b'')
         wb.write()
 
+    def observations_for_nodes(self, node_ids):
+        observation_ids = []
+        for node_id in node_ids:
+            integrated_observations = self.get_integrated_observations(node_id)
+            observation_ids.extend(integrated_observations)
+            predicted_observations = self.get_predicted_observations(node_id)
+            observation_ids.extend(predicted_observations)
+        return observation_ids
 
     # predicted_node:[observation_id]:[node_id]
     @staticmethod
@@ -695,7 +588,6 @@ class MemoryGraph:
         stop = MemoryGraph.predicted_nodes_key(observation_id, MAX_KEY_VALUE)
         return [struct.unpack_from('>Q', b, offset=9)[0] for b in self.db.iterator(start=start, stop=stop, include_value=False)]
 
-
     # integrated_node:[observation_id]:[node_id]
     @staticmethod
     def integrated_nodes_key(observation_id, node_id):
@@ -707,7 +599,6 @@ class MemoryGraph:
         stop = MemoryGraph.integrated_nodes_key(observation_id, MAX_KEY_VALUE)
         return [struct.unpack_from('>Q', b, offset=9)[0] for b in self.db.iterator(start=start, stop=stop, include_value=False)]
 
-
     def get_adjacencies(self, node_id, radius):
         cwg.neighbors(self.graph, node_id, radius)
    
@@ -716,13 +607,11 @@ class MemoryGraph:
         self.save_edges([(from_id, to_id)])
         cwg.add_edge(self.graph, from_id, to_id)
 
-
     def insert_adjacencies(self, edges):
         edges = [e for e in edges if e[0] != e[1]]
         self.save_edges(edges)
         for e in edges:
             cwg.add_edge(self.graph, e[0], e[1])
-
 
     def knn_query(self, feats, k=1):
         if len(feats) == 0:
@@ -732,7 +621,20 @@ class MemoryGraph:
     def index_count(self):
         return cwg.len(self.graph)
 
-    
+
+    ######################
+    # CACHED COMMUNITIES
+    ######################
+
+    def read_community(self, node_id, walk_length, walk_trials, member_portion):
+        b = self.db.get(MemoryGraph.community_key(node_id, walk_length, walk_trials, member_portion))
+        if b is None:
+            return None
+        return MemoryGraph.decode_community(b)
+
+    def write_community(self, node_id, walk_length, walk_trials, member_portion, community):
+        self.db.put(MemoryGraph.community_key(node_id, walk_length, walk_trials, member_portion), MemoryGraph.encode_community(community))
+
     def get_communities(self, node_ids, walk_length=10, walk_trials=1000, member_portion=200):
         return cwg.communities(self.graph, node_ids, walk_length, walk_trials, member_portion)
 
@@ -754,16 +656,9 @@ class MemoryGraph:
         return set(community)
 
 
-
-    def observations_for_nodes(self, node_ids):
-        observation_ids = []
-        for node_id in node_ids:
-            integrated_observations = self.get_integrated_observations(node_id)
-            observation_ids.extend(integrated_observations)
-            predicted_observations = self.get_predicted_observations(node_id)
-            observation_ids.extend(predicted_observations)
-        return observation_ids
-
+    ######################
+    # COMMUNITY SEARCH
+    ######################
 
     # searches using the max pool of the provided feature cluster
     def search_group_foo(self, features, params):
@@ -944,35 +839,6 @@ def next_pos(kp_grid, shape, g_pos, walk_length, stride):
     return loc, pos, False
 
 
-# def object_names_from_image_file(image_file):
-#     return re.findall('_([a-z]+)', image_file)
-
-
-# def pixel_counts(obj_frame, center_size):
-#     unique, counts = np.unique(obj_frame, return_counts=True)
-#     unique = [object_name_for_idx(o) for o in unique]
-
-#     min_pix = center_size * center_size * 0.9
-#     pixels = dict([(u, c) for u, c in zip(unique, counts) if u is not None and c > min_pix])
-    
-#     return pixels
-
-
-# def extract_object(window, center_size):
-#     c = np.bincount(window.flatten())
-#     if np.max(c) >= center_size*center_size*.90:
-#         return object_name_for_idx(np.argmax(c))
-#     else:
-#         return None
-
-
-# def extract_objects(obj_frame, pos, center_size):
-#     windows = np.empty((len(pos), center_size, center_size), dtype=np.uint8)
-
-#     for i in range(len(pos)):
-#         windows[i] = extract_window(obj_frame, pos[i], center_size)
-
-#     return [extract_object(w, center_size) for w in windows]
 
 
 def extract_windows(frame, pos, window_size):
@@ -987,26 +853,31 @@ def extract_windows(frame, pos, window_size):
 
 def extract_window(frame, pos, window_size):
     half_w = window_size/2.0
-    bottom_left = [int(round(pos[0]-half_w)), int(round(pos[1]-half_w))]
-    top_right = [bottom_left[0]+window_size, bottom_left[1]+window_size]
-   
-    if bottom_left[0] < 0:
-        top_right[0] -= bottom_left[0]
-        bottom_left[0] = 0
 
-    if bottom_left[1] < 0:
-        top_right[1] -= bottom_left[1]
-        bottom_left[1] = 0
+    top_left = [int(round(pos[0]-half_w)), int(round(pos[1]-half_w))]
+    bottom_right = [top_left[0]+window_size, top_left[1]+window_size]
 
-    if top_right[0] >= frame.shape[0]:
-        bottom_left[0] -= (top_right[0]-frame.shape[0]+1)
-        top_right[0] = frame.shape[0]-1
+    # if top_left[0] < 0:
+    #     print('*')
+    #     top_right[0] -= bottom_left[0]
+    #     bottom_left[0] = 0
 
-    if top_right[1] >= frame.shape[1]:
-        bottom_left[1] -= (top_right[1]-frame.shape[1]+1)
-        top_right[1] = frame.shape[1]-1
+    # if top_left[1] < 0:
+    #     print('*')
+    #     top_right[1] -= bottom_left[1]
+    #     bottom_left[1] = 0
 
-    return frame[bottom_left[0]:top_right[0], bottom_left[1]:top_right[1]]
+    # if bottom_right[0] >= frame.shape[0]:
+    #     print('*')
+    #     bottom_left[0] -= (top_right[0]-frame.shape[0]+1)
+    #     top_right[0] = frame.shape[0]-1
+
+    # if bottom_right[1] >= frame.shape[1]:
+    #     print('*')
+    #     bottom_left[1] -= (top_right[1]-frame.shape[1]+1)
+    #     top_right[1] = frame.shape[1]-1
+
+    return frame[top_left[0]:bottom_right[0], top_left[1]:bottom_right[1]]
 
 
 def key_point_grid(orb, frame, stride):
@@ -1027,36 +898,6 @@ def key_point_grid(orb, frame, stride):
             grid[g] = [p]
 
     return grid
-
-# def extract_window_pixels(pos, frame_shape, window_size):
-#     half_w = window_size/2.0
-#     bottom_left = [int(round(pos[0]-half_w)), int(round(pos[1]-half_w))]
-#     top_right = [bottom_left[0]+window_size, bottom_left[1]+window_size]
-   
-#     if bottom_left[0] < 0:
-#         top_right[0] -= bottom_left[0]
-#         bottom_left[0] = 0
-
-#     if bottom_left[1] < 0:
-#         top_right[1] -= bottom_left[1]
-#         bottom_left[1] = 0
-
-#     if top_right[0] >= frame_shape[0]:
-#         bottom_left[0] -= (top_right[0]-frame_shape[0]+1)
-#         top_right[0] = frame_shape[0]-1
-
-#     if top_right[1] >= frame_shape[1]:
-#         bottom_left[1] -= (top_right[1]-frame_shape[1]+1)
-#         top_right[1] = frame_shape[1]-1
-
-#     points = []
-#     for y in range(bottom_left[0], top_right[0]):
-#         for x in range(bottom_left[1], top_right[1]):
-#             points.append((y,x))
-            
-#     return points
-    
-
 
 
 ###############
@@ -1093,6 +934,7 @@ def build_graph(db_path, image_files, params):
             image_file_count += 1
 
             pil_image = Image.open(image_file).convert('RGB')
+            pil_image = pil_image.resize((int(round(pil_image.size[0]/3)), int(round(pil_image.size[1]/3))))
             image = np.array(pil_image)
 
             g_pos = [None for _ in range(params["walker_count"])]
@@ -1210,71 +1052,18 @@ def build_graph(db_path, image_files, params):
                     # "askp", adjacencies_skipped
                 )
 
-    counts = memory_graph.get_counts()
-    print("counts", counts)
-
     memory_graph.close()
 
     print("Done")
 
 
 
-# utility for working with marks and intervals
-# a mark is a nanosecond timestamp returned from time.time_ns()
-# an interval is time elapsed between two marks
-class TimeMarker:
-    def __init__(self, enabled=True, l="start"):
-        self.enabled = enabled
-        if enabled:
-            self.last = time.time_ns()
-            self.mark_dict = {l: self.last}
-            self.saved = {}
-
-    # sets a new time mark and calculates the interval from the new time mark to a previous time mark
-    # l: give this mark a label to be used later
-    # i: calculate the interval since a labeled mark instead of using simply the last mark
-    # s: save the interval in a dict with this name
-    # a: add this interval to the value in saved dict 
-    # p: print the interval with the given text
-    # si: a shortcut to set s and i to the same value
-    def mark(self, l=None, i=None, s=None, a=None, p=None, si=None):
-        if not self.enabled:
-            return 0
-
-        if si is not None:
-            s = si
-            i = si
-
-        t = time.time_ns()
-        
-        if l is not None:
-            self.mark_dict[l] = t
-        
-        if i is not None:
-            r = t - self.mark_dict[i]     
-        else:
-            r = t - self.last
-
-        self.last = t
-
-        if s is not None:
-            self.saved[s] = r
-        elif a is not None:
-            if a not in self.saved:
-                self.saved[a] = r
-            else:
-                self.saved[a] += r
-        if p is not None:
-            print(p, r)
-
-        return r
-
 
 PARAMETERS = {
 	"runs": 1,
     "window_size": 32, 
 	"grid_margin": 16, 
-    "max_frames": 30*5,
+    "max_frames": 32,
 	"search_max_frames": 30, 
 	"max_elements": 12000000,
     "space": 'cosine', 
@@ -1286,8 +1075,8 @@ PARAMETERS = {
 
 	"stride": 24,
 	"center_size": 16,
-	"walk_length": 100,
-    "walker_count": 200,
+	"walk_length": 32,
+    "walker_count": 16,
     "prevent_similar_adjacencies": False,
     "knn": 50,
     "accurate_prediction_limit": 12,
@@ -1296,9 +1085,9 @@ PARAMETERS = {
     "history_community_matches": 1,
     "identical_distance": 0.15,
     "search_walker_count": 4,
-    "search_walk_length": 10,
+    "search_walk_length": 3,
     "feature_dis": 0.4,
-    "community_dis": 0.15,
+    "community_dis": 0.25,
     "search_knn": 100,
     "initial_walk_length": 8,  
     "max_walk_length": 4096,

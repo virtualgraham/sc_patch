@@ -5,54 +5,62 @@ import random
 import math 
 import re 
 from datetime import datetime
-
+from glob import glob
+from PIL import Image
 
 from ShufflePatchModel import ShufflePatchFeatureExtractor
 
 # from tensorflow.keras.applications import vgg16
 # from tensorflow.keras.applications.vgg16 import preprocess_input
 
-from vgg16_window_walker_lib_images import color_fun, extract_windows, extract_window, extract_object, get_rad_grid, MemoryGraph, extract_window_pixels, PARAMETERS
+from vgg16_window_walker_lib_images import extract_windows, extract_window, get_rad_grid, MemoryGraph, PARAMETERS
 
 from itertools import chain
 
 
 
 def key_point_grid(orb, frame, mask, grid_margin, stride):
+    # print('frame.shape, stride', frame.shape, mask.shape, stride)
+    grid_height = math.floor((frame.shape[0] - grid_margin*2) / stride)
+    grid_width = math.floor((frame.shape[1] - grid_margin*2) / stride)
 
-    grid_width = math.floor((frame.shape[0] - grid_margin*2) / stride)
-    grid_height = math.floor((frame.shape[1] - grid_margin*2) / stride)
+    # print('grid_width grid_height', grid_width, grid_height)
+    grid_offset_y = ((frame.shape[0] - grid_margin*2) % stride)/2.0 + grid_margin
+    grid_offset_x = ((frame.shape[1] - grid_margin*2) % stride)/2.0 + grid_margin
 
-    grid_offset_x = ((frame.shape[0] - grid_margin*2) % stride)/2.0 + grid_margin
-    grid_offset_y = ((frame.shape[1] - grid_margin*2) % stride)/2.0 + grid_margin
+    object_grid_locations = set()
 
-    # object_grid_locations = set()
+    for x in range(grid_width):
+        for y in range(grid_height):
+            p = (grid_offset_y + y * stride + 0.5 * stride, grid_offset_x + x * stride + 0.5 * stride)
+            w = extract_window(mask, p, stride)
 
-    #print("grid_width", grid_width, "grid_height", grid_height)
-    # for x in range(grid_width):
-    #     for y in range(grid_height):
-    #         p = (grid_offset_x + x * stride + 0.5 * stride, grid_offset_y + y * stride + 0.5 * stride)
-    #         w = extract_window(frame, p, stride)
-    #         if extract_object(w, stride) is not None:
-    #             object_grid_locations.add((x, y))
-    
-    #print("len(object_grid_locations)", len(object_grid_locations))
+            print(np.sum(w))
+            if np.sum(w) >= stride * stride * 0.3:
+                object_grid_locations.add((y, x))
+
+    # print('len(object_grid_locations)', len(object_grid_locations))
+
     kp = orb.detect(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), None)
-    #print("len(kp)", len(kp))
+
+    # print('object_grid_locations', object_grid_locations)
 
     grid = dict()
 
+    
     for k in kp:
-        p = (k.pt[1],k.pt[0])
-        g = (int(math.floor((p[0]-grid_offset_x)/stride)), int(math.floor((p[1]-grid_offset_y)/stride)))
+        p = (k.pt[0], k.pt[1])
+        g = (int(math.floor((p[0]-grid_offset_y)/stride)), int(math.floor((p[1]-grid_offset_x)/stride)))
 
-        ### TODO: implement if g in mask
-        if True # g in mask:
+        # print(g)
+
+        if g in object_grid_locations:
             if g in grid:
                 grid[g].append(p)
             else:
                 grid[g] = [p]
 
+    # print('len(grid)', len(grid))
     return grid
 
 
@@ -89,17 +97,19 @@ def search(image_files, mask_files, db_path, params):
     # cnn = vgg16.VGG16(weights="imagenet", include_top=False, input_shape=(32, 32, 3))
     orb = cv2.ORB_create(nfeatures=100000, fastThreshold=7)
 
-    return [search_file(image_file[i], mask_file[i], memory_graph, cnn, orb, params) for i in range(len(image_files))]
+    return [search_file(image_files[i], mask_files[i], memory_graph, cnn, orb, params) for i in range(len(image_files))]
 
 
 ## get the k nearest neighbors for the given input image
 def search_file(image_file, mask_file, memory_graph, cnn, orb, params):
-    print("search", file)
+    print("search", image_file, mask_file)
 
     pil_image = Image.open(image_file).convert('RGB')
+    pil_image = pil_image.resize((int(round(pil_image.size[0]/3)), int(round(pil_image.size[1]/3))))
     image = np.array(pil_image)
 
     pil_mask = Image.open(mask_file).convert('1')
+    pil_mask = pil_mask.resize((int(round(pil_mask.size[0]/3)), int(round(pil_mask.size[1]/3))))
     mask = np.array(pil_mask)
 
     g_pos = [None for _ in range(params["search_walker_count"])]
@@ -165,10 +175,22 @@ def search_file(image_file, mask_file, memory_graph, cnn, orb, params):
         if done:
             break
 
-    print(image_file)
+    observations = memory_graph.get_observations(observation_ids)
+    result = set([o["file"] for o in observations])
+    print(result)
+    return result
 
-image_files = glob()
-mask_files = glob()
-db_path = "../../data/table_objects_j.db"
+image_files = glob("dataset_100/test/*/*.jpg")
+mask_files = glob("dataset_100/test/*/*.mask.png")
 
-search(image_files, mask_files, db_path, PARAMETERS)
+image_files.sort()
+mask_files.sort()
+
+print(image_files)
+print(mask_files)
+
+db_path = "../../data/variations_test.db"
+
+neighbor_files = search(image_files, mask_files, db_path, PARAMETERS)
+
+print(neighbor_files)
