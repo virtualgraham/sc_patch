@@ -53,6 +53,7 @@ chmod +x start.sh
 
 pip3 install torch torchvision 
 pip3 install tqdm torchsummary
+pip3 install opencv-contrib-python
 
 ## Set CUDA version ##
 sudo rm /usr/local/cuda
@@ -62,3 +63,5 @@ detach data disk in console
 change to g4dn.xlarge
 
 sudo ./start.sh 
+
+sudo crontab -e
