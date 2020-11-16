@@ -2,9 +2,11 @@
 
 Experiments with representation learning based on:
 
-[Unsupervised Visual Representation Learning by Context Prediction](https://arxiv.org/abs/1505.05192) 
+[Unsupervised Visual Representation Learning by Context Prediction](https://arxiv.org/abs/1505.05192)  
 [Unsupervised Learning of Visual Representations by Solving Jigsaw Puzzles](https://arxiv.org/abs/1603.09246)  
-```
+[Unsupervised Representation Learning by Predicting Image Rotations](https://arxiv.org/abs/1803.07728)  
+[Revisiting Self-Supervised Visual Representation Learning](https://arxiv.org/abs/1901.09005)  
+
 
 ## `src/sc_patch_b.py`
 Method based [Unsupervised Visual Representation Learning by Context Prediction](https://arxiv.org/abs/1505.05192)
@@ -19,4 +21,12 @@ Main differences from original method in paper:
 Method based on [Unsupervised Learning of Visual Representations by Solving Jigsaw Puzzles](https://arxiv.org/abs/1603.09246)
 - Uses VGG16 instead of AlexNet
 - Uses the larger, higher resolution open-image dataset
-- Uses 4 patches instead of 9, this has only 24 permutations so there in no need to sample from the complete set of permutations. Potentially having 4 patches and larger images could be better than 9 patches with smaller images. With the original method with 9 patches there is a hidden assumption that each image has a single subject. Most of the sample pictures have a cat or a car thats fills up the frame. Even though this assumption is often false, the 9 patches are meant to represent parts of a single subject. This is not neccerilly the case in more complex scenes without well framed subjects. With 4 patches and larger images, the patches are all neighbors in a smaller region. So even if the image is composed of multiple objects, the relationships between adjacent parts may be better represented. 
+- Uses 4 patches instead of 9, this has only 24 permutations so there in no need to sample from the complete set of permutations. Potentially having 4 patches may be better than 9 patches. 9 patches seems like a more difficult task than 4 patches. However because with the 9 patch method the permutations are sampled, the task can be simplified to only finding the correct orientation between any two patches. Once certainty of the orientation of any two patches is achieved, the probability that there is only a single available permutation that includes the known single orientation is extremely high. 
+
+## `src/rotation_jigsaw.py`
+- Combines 4 patch jigsaw with rotation from [Unsupervised Representation Learning by Predicting Image Rotations](https://arxiv.org/abs/1803.07728)  
+- Uses Google's Open Images dataset
+
+
+## `src/rotation_jigsaw_resnet50.py`
+TODO: implement rotation jigsaw with ResNet50 or RevNet50 from [Revisiting Self-Supervised Visual Representation Learning](https://arxiv.org/abs/1901.09005)
