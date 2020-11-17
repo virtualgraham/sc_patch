@@ -1,5 +1,16 @@
 # Jigsaw Patch Descriptor
 
+The objective here is to create an object part patch descriptor in an unsupervised manner. The patch descriptor is needed for the [fgraph](https://github.com/virtualgraham/fgraph)] project that connects features in a graph for object discovery currently only uses a deep neural networks a source of feature descriptors.  
+
+The patch based unsupervised visual representation learning methods used here have mostly not been tested as patch descriptors (despite it being called "representation" learning) but rather the evaluation of these methods have been mostly tested using transfer learning to traditional object classification tasks.  
+
+The working hypothesis behind this project is that the patch based methods used for image representation learning are well suited for local object part patch descriptors, potentially exceeding other local feature descriptors such as HOG and SIFT for object part representation, and are not as effective at global image descriptors. An object part model that uses patch descriptors would be more effective using cnn features produced by unsupervised representation learning than using the features from the same cnn architecture trained on a supervised classification task.  
+
+The use of unsupervised visual representation learning as object part representations was discussed and examined early on by [Doersch et al](https://arxiv.org/abs/1505.05192). However in the followup papers expanding and improving the methods, this research angle was overshadowed by the transfer learning task.  
+
+Transfer learning from the unsupervised to the supervised classification task may be a misleading test of the effectiveness of unsupervised visual representation learning methods. This is because the image classification task not only finds object part features but also finds relationships between object features. Patch descriptors will fall short in whole image classification tasks because they do not represent relationships between object parts, because they do not contain representations of part relationships. A good patch descriptor however does provide a good way to represent features at many scales and at higher resolutions. For example a patch descriptor can be trained on high resoluton details of objects that size constraints would prevent a cnn classification model from fitting all the high resolution parts into a single input.  
+
+
 Experiments with representation learning based on:
 
 [Unsupervised Visual Representation Learning by Context Prediction](https://arxiv.org/abs/1505.05192)  

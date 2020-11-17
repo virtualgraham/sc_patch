@@ -46,11 +46,10 @@ training_image_paths = glob('/data/open-images-dataset/train/*.jpg')
 validation_image_paths = glob('/data/open-images-dataset/validation/*.jpg')
 
 train_dataset_length = 40960
-validation_dataset_length = 4096
+validation_dataset_length = 40960
 train_batch_size = 128
 validation_batch_size = 128
 num_epochs = 3000
-save_after_epochs = 1 
 backup_after_epochs = 10 
 model_save_prefix = "rotation_jigsaw"
 color_shift = 1
@@ -407,7 +406,11 @@ for epoch in range(last_epoch+1, num_epochs):
     train_running_loss = []
     val_running_loss = []
     start_time = time.time()
+
     model.train()
+
+
+    ## Train 
     for idx, data in tqdm(enumerate(trainloader), total=int(len(traindataset)/train_batch_size)):
         patch_a, patch_b, patch_c, patch_d, patch_shuffle_order_label = data[0].to(device), data[1].to(device), data[2].to(device), data[3].to(device), data[4].to(device)
         optimizer.zero_grad()
@@ -417,7 +420,11 @@ for epoch in range(last_epoch+1, num_epochs):
         optimizer.step()
         
         train_running_loss.append(loss.item())
-    else:
+  
+
+    ## Validation
+
+    if epoch % backup_after_epochs == 0:
       correct = 0
       total = 0
       model.eval()
@@ -434,6 +441,7 @@ for epoch in range(last_epoch+1, num_epochs):
         print('Val Progress --- total:{}, correct:{}'.format(total, correct.item()))
         print('Val Accuracy of the network on the test images: {}%'.format(100 * correct.item() / total))
 
+
     global_trn_loss.append(sum(train_running_loss) / len(train_running_loss))
     global_val_loss.append(sum(val_running_loss) / len(val_running_loss))
 
@@ -441,31 +449,30 @@ for epoch in range(last_epoch+1, num_epochs):
         epoch + 1, num_epochs, global_trn_loss[-1], global_val_loss[-1],
         (time.time() - start_time) / 60))
     
-    if epoch % save_after_epochs == 0:
+    # delete old images
+    training_image_paths = glob(f'{model_save_prefix}_*.pt')
+    if len(training_image_paths) > 2:
+      training_image_paths.sort()
+      for i in range(len(training_image_paths)-2):
+        training_image_path = training_image_paths[i]
+        os.remove(training_image_path)
 
-      # delete old images
-      training_image_paths = glob(f'{model_save_prefix}_*.pt')
-      if len(training_image_paths) > 2:
-        training_image_paths.sort()
-        for i in range(len(training_image_paths)-2):
-          training_image_path = training_image_paths[i]
-          os.remove(training_image_path)
-
-      # save new image
-      model_save_path = f'{model_save_prefix}_{epoch:04d}.pt'
-      print('saving checkpoint', model_save_path)
-      torch.save(
-        {
-            'epoch': epoch,
-            'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'loss': loss,
-            'global_trnloss': global_trn_loss,
-            'global_valloss': global_val_loss
-        }, model_save_path)
-    
-      if epoch % backup_after_epochs == 0:
-        print('backing up checkpoint', model_save_path)
-        os.system(f'aws s3 cp /data/{model_save_path} s3://guiuan/{model_save_prefix}_{epoch:04d}_{learn_rate}_{global_trn_loss[-1]:.4f}_{(100 * correct.item()/total):.2f}.pt')
+    # save new image
+    model_save_path = f'{model_save_prefix}_{epoch:04d}.pt'
+    print('saving checkpoint', model_save_path)
+    torch.save(
+      {
+          'epoch': epoch,
+          'model_state_dict': model.state_dict(),
+          'optimizer_state_dict': optimizer.state_dict(),
+          'loss': loss,
+          'global_trnloss': global_trn_loss,
+          'global_valloss': global_val_loss
+      }, model_save_path
+    )
+  
+    if epoch % backup_after_epochs == 0:
+      print('backing up checkpoint', model_save_path)
+      os.system(f'aws s3 cp /data/{model_save_path} s3://guiuan/{model_save_prefix}_{epoch:04d}_{learn_rate}_{global_trn_loss[-1]:.4f}_{(100 * correct.item()/total):.2f}.pt')
 
 print("done")
