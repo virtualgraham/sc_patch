@@ -404,7 +404,7 @@ for epoch in range(last_epoch+1, num_epochs):
     print("epoch", epoch)
 
     train_running_loss = []
-    val_running_loss = []
+    
     start_time = time.time()
 
     model.train()
@@ -421,13 +421,17 @@ for epoch in range(last_epoch+1, num_epochs):
         
         train_running_loss.append(loss.item())
   
+    global_trn_loss.append(sum(train_running_loss) / len(train_running_loss))
+
 
     ## Validation
 
     if epoch % backup_after_epochs == 0:
+      val_running_loss = []
       correct = 0
       total = 0
       model.eval()
+
       with torch.no_grad():
         for idx, data in tqdm(enumerate(valloader), total=int(len(valdataset)/validation_batch_size)):
           patch_a, patch_b, patch_c, patch_d, patch_shuffle_order_label = data[0].to(device), data[1].to(device), data[2].to(device), data[3].to(device), data[4].to(device)
@@ -441,10 +445,15 @@ for epoch in range(last_epoch+1, num_epochs):
         print('Val Progress --- total:{}, correct:{}'.format(total, correct.item()))
         print('Val Accuracy of the network on the test images: {}%'.format(100 * correct.item() / total))
 
+      global_val_loss.append(sum(val_running_loss) / len(val_running_loss))
 
-    global_trn_loss.append(sum(train_running_loss) / len(train_running_loss))
-    global_val_loss.append(sum(val_running_loss) / len(val_running_loss))
-
+    else:
+      if len(global_val_loss) > 0:
+        global_val_loss.append(global_val_loss[-1])
+      else:
+        global_val_loss.append(0)
+    
+    
     print('Epoch [{}/{}], TRNLoss:{:.4f}, VALLoss:{:.4f}, Time:{:.2f}'.format(
         epoch + 1, num_epochs, global_trn_loss[-1], global_val_loss[-1],
         (time.time() - start_time) / 60))
