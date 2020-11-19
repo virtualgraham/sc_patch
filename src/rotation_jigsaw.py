@@ -58,7 +58,7 @@ jitter = 16
 gray_portion = .30
 reuse_image_count = 4
 
-learn_rate = 0.001
+learn_rate = 0.0001
 momentum = 0.974
 weight_decay = 0.0005
 
