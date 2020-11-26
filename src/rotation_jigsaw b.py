@@ -46,13 +46,12 @@ training_image_paths = glob('/data/open-images-dataset/train/*.jpg')
 validation_image_paths = glob('/data/open-images-dataset/validation/*.jpg')
 
 train_dataset_length = 40960
-validation_dataset_length = 4096
+validation_dataset_length = 40960
 train_batch_size = 128
 validation_batch_size = 128
 num_epochs = 3000
-save_after_epochs = 1 
 backup_after_epochs = 10 
-model_save_prefix = "rotation_jigsaw"
+model_save_prefix = "rotation_jigsaw_b"
 color_shift = 1
 patch_dim = 96
 jitter = 16
@@ -110,7 +109,7 @@ class ShufflePatchDataset(Dataset):
     self.sub_window_width = self.patch_dim + 2*self.jitter + 2*self.color_shift
     self.window_width = 2*self.sub_window_width
     
-    self.min_image_width = self.window_width + 1
+    self.min_image_width = self.window_width + 2*self.jitter
 
     self.saliency = cv2.saliency.StaticSaliencyFineGrained_create()
 
@@ -143,22 +142,6 @@ class ShufflePatchDataset(Dataset):
 
     return cropped
 
-  def saliency_check(self, window, patch_coords):
-    (success, saliency_map) = self.saliency.computeSaliency(cv2.cvtColor(window, cv2.COLOR_RGB2BGR))
-
-    high_saliency_patches = 0
-    med_saliency_patches = 0
-    
-    for p in patch_coords:
-        patch_saliency_map = saliency_map[p[0]:p[0]+self.patch_dim, p[1]:p[1]+self.patch_dim]
-        patch_saliency = np.sum(patch_saliency_map > .5)
-        if patch_saliency >= 400:
-          high_saliency_patches += 1
-        elif patch_saliency >= 150:
-          med_saliency_patches += 1
-
-    return high_saliency_patches > 0 and (high_saliency_patches + med_saliency_patches) > 2
-
 
   def __getitem__(self, index):
     # [y, x, chan], dtype=uint8, top_left is (0,0)
@@ -166,16 +149,18 @@ class ShufflePatchDataset(Dataset):
     image_index = int(math.floor((len(self.image_paths) * random.random())))
     
     if self.image_reused == 0:
-      self.pil_image = Image.open(self.image_paths[image_index]).convert('RGB')
+      pil_image = Image.open(self.image_paths[image_index]).convert('RGB')
+
+      if pil_image.size[1] > pil_image.size[0]:
+        self.pil_image = pil_image.resize((self.min_image_width, int(round(pil_image.size[1]/pil_image.size[0] * self.min_image_width))))
+      else:
+        self.pil_image = pil_image.resize((int(round(pil_image.size[0]/pil_image.size[1] * self.min_image_width)), self.min_image_width))
+
       self.image_reused = reuse_image_count - 1
     else:
       self.image_reused -= 1
 
     image = np.array(self.pil_image)
-
-    # If image is too small, try another image
-    if (image.shape[0] - self.min_image_width) <= 0 or (image.shape[1] - self.min_image_width) <= 0:
-        return self.__getitem__(index)
     
     window_y_coord = int(math.floor((image.shape[0] - self.window_width) * random.random()))
     window_x_coord = int(math.floor((image.shape[1] - self.window_width) * random.random()))
@@ -197,15 +182,10 @@ class ShufflePatchDataset(Dataset):
 
     patch_coords = [pc for _,pc in sorted(zip(patch_order_arr[order_label],patch_coords))]
 
-    if not self.saliency_check(window, patch_coords):
-      return self.__getitem__(index)
-
     patch_a = window[patch_coords[0][0]:patch_coords[0][0]+self.patch_dim+2*self.color_shift, patch_coords[0][1]:patch_coords[0][1]+self.patch_dim+2*self.color_shift]
     patch_b = window[patch_coords[1][0]:patch_coords[1][0]+self.patch_dim+2*self.color_shift, patch_coords[1][1]:patch_coords[1][1]+self.patch_dim+2*self.color_shift]
     patch_c = window[patch_coords[2][0]:patch_coords[2][0]+self.patch_dim+2*self.color_shift, patch_coords[2][1]:patch_coords[2][1]+self.patch_dim+2*self.color_shift]
     patch_d = window[patch_coords[3][0]:patch_coords[3][0]+self.patch_dim+2*self.color_shift, patch_coords[3][1]:patch_coords[3][1]+self.patch_dim+2*self.color_shift]
-
-    # gray = random.random() < gray_portion
 
     patch_a = self.prep_patch(patch_a)
     patch_b = self.prep_patch(patch_b)
@@ -249,119 +229,6 @@ valloader = torch.utils.data.DataLoader(valdataset,
 ##################################################
 # Model for learning patch position
 ##################################################
-
-
-class ResNet(nn.Module):
-
-    def __init__(
-        self,
-        block: Type[Union[BasicBlock, Bottleneck]],
-        layers: List[int],
-        num_classes: int = 1000,
-        zero_init_residual: bool = False,
-        groups: int = 1,
-        width_per_group: int = 64,
-        replace_stride_with_dilation: Optional[List[bool]] = None,
-        norm_layer: Optional[Callable[..., nn.Module]] = None
-    ) -> None:
-        super(ResNet, self).__init__()
-        if norm_layer is None:
-            norm_layer = nn.BatchNorm2d
-        self._norm_layer = norm_layer
-
-        self.inplanes = 64
-        self.dilation = 1
-        if replace_stride_with_dilation is None:
-            # each element in the tuple indicates if we should replace
-            # the 2x2 stride with a dilated convolution instead
-            replace_stride_with_dilation = [False, False, False]
-        if len(replace_stride_with_dilation) != 3:
-            raise ValueError("replace_stride_with_dilation should be None "
-                             "or a 3-element tuple, got {}".format(replace_stride_with_dilation))
-        self.groups = groups
-        self.base_width = width_per_group
-        self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3,
-                               bias=False)
-        self.bn1 = norm_layer(self.inplanes)
-        self.relu = nn.ReLU(inplace=True)
-        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(block, 64, layers[0])
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=2,
-                                       dilate=replace_stride_with_dilation[0])
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=2,
-                                       dilate=replace_stride_with_dilation[1])
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
-                                       dilate=replace_stride_with_dilation[2])
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(512 * block.expansion, num_classes)
-
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-            elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-
-        # Zero-initialize the last BN in each residual branch,
-        # so that the residual branch starts with zeros, and each residual block behaves like an identity.
-        # This improves the model by 0.2~0.3% according to https://arxiv.org/abs/1706.02677
-        if zero_init_residual:
-            for m in self.modules():
-                if isinstance(m, Bottleneck):
-                    nn.init.constant_(m.bn3.weight, 0)  # type: ignore[arg-type]
-                elif isinstance(m, BasicBlock):
-                    nn.init.constant_(m.bn2.weight, 0)  # type: ignore[arg-type]
-
-    def _make_layer(self, block: Type[Union[BasicBlock, Bottleneck]], planes: int, blocks: int,
-                    stride: int = 1, dilate: bool = False) -> nn.Sequential:
-        norm_layer = self._norm_layer
-        downsample = None
-        previous_dilation = self.dilation
-        if dilate:
-            self.dilation *= stride
-            stride = 1
-        if stride != 1 or self.inplanes != planes * block.expansion:
-            downsample = nn.Sequential(
-                conv1x1(self.inplanes, planes * block.expansion, stride),
-                norm_layer(planes * block.expansion),
-            )
-
-        layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample, self.groups,
-                            self.base_width, previous_dilation, norm_layer))
-        self.inplanes = planes * block.expansion
-        for _ in range(1, blocks):
-            layers.append(block(self.inplanes, planes, groups=self.groups,
-                                base_width=self.base_width, dilation=self.dilation,
-                                norm_layer=norm_layer))
-
-        return nn.Sequential(*layers)
-
-    def _forward_impl(self, x: Tensor) -> Tensor:
-        # See note [TorchScript super()]
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
-
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        x = self.fc(x)
-
-        return x
-
-    def forward(self, x: Tensor) -> Tensor:
-        return self._forward_impl(x)
-
-
-
-    return _resnet('resnet50', Bottleneck, [3, 4, 6, 3], pretrained, progress,
-                   **kwargs)
 
 class VggNetwork(nn.Module):
   def __init__(self,aux_logits = False):
@@ -460,7 +327,7 @@ class VggNetwork(nn.Module):
     output = torch.cat((output_fc6_patch_a, output_fc6_patch_b, output_fc6_patch_c, output_fc6_patch_d), 1)
     output = self.fc(output)
 
-    return output, output_fc6_patch_a, output_fc6_patch_b, output_fc6_patch_c, output_fc6_patch_d
+    return output
 
 model = VggNetwork().to(device)
 summary(model, [(3, patch_dim, patch_dim), (3, patch_dim, patch_dim), (3, patch_dim, patch_dim), (3, patch_dim, patch_dim)])
@@ -518,26 +385,38 @@ for epoch in range(last_epoch+1, num_epochs):
     print("epoch", epoch)
 
     train_running_loss = []
-    val_running_loss = []
+    
     start_time = time.time()
+
     model.train()
+
+
+    ## Train 
     for idx, data in tqdm(enumerate(trainloader), total=int(len(traindataset)/train_batch_size)):
         patch_a, patch_b, patch_c, patch_d, patch_shuffle_order_label = data[0].to(device), data[1].to(device), data[2].to(device), data[3].to(device), data[4].to(device)
         optimizer.zero_grad()
-        output, output_fc6_patch_a, output_fc6_patch_b, output_fc6_patch_c, output_fc6_patch_d = model(patch_a, patch_b, patch_c, patch_d)
+        output = model(patch_a, patch_b, patch_c, patch_d)
         loss = criterion(output, patch_shuffle_order_label)
         loss.backward()
         optimizer.step()
         
         train_running_loss.append(loss.item())
-    else:
+  
+    global_trn_loss.append(sum(train_running_loss) / len(train_running_loss))
+
+
+    ## Validation
+
+    if epoch % backup_after_epochs == 0:
+      val_running_loss = []
       correct = 0
       total = 0
       model.eval()
+
       with torch.no_grad():
         for idx, data in tqdm(enumerate(valloader), total=int(len(valdataset)/validation_batch_size)):
           patch_a, patch_b, patch_c, patch_d, patch_shuffle_order_label = data[0].to(device), data[1].to(device), data[2].to(device), data[3].to(device), data[4].to(device)
-          output, output_fc6_patch_a, output_fc6_patch_b, output_fc6_patch_c, output_fc6_patch_d = model(patch_a, patch_b, patch_c, patch_d)
+          output = model(patch_a, patch_b, patch_c, patch_d)
           loss = criterion(output, patch_shuffle_order_label)
           val_running_loss.append(loss.item())
         
@@ -547,38 +426,43 @@ for epoch in range(last_epoch+1, num_epochs):
         print('Val Progress --- total:{}, correct:{}'.format(total, correct.item()))
         print('Val Accuracy of the network on the test images: {}%'.format(100 * correct.item() / total))
 
-    global_trn_loss.append(sum(train_running_loss) / len(train_running_loss))
-    global_val_loss.append(sum(val_running_loss) / len(val_running_loss))
+      global_val_loss.append(sum(val_running_loss) / len(val_running_loss))
 
+    else:
+      if len(global_val_loss) > 0:
+        global_val_loss.append(global_val_loss[-1])
+      else:
+        global_val_loss.append(0)
+    
+    
     print('Epoch [{}/{}], TRNLoss:{:.4f}, VALLoss:{:.4f}, Time:{:.2f}'.format(
         epoch + 1, num_epochs, global_trn_loss[-1], global_val_loss[-1],
         (time.time() - start_time) / 60))
     
-    if epoch % save_after_epochs == 0:
+    # delete old images
+    training_image_paths = glob(f'{model_save_prefix}_*.pt')
+    if len(training_image_paths) > 2:
+      training_image_paths.sort()
+      for i in range(len(training_image_paths)-2):
+        training_image_path = training_image_paths[i]
+        os.remove(training_image_path)
 
-      # delete old images
-      training_image_paths = glob(f'{model_save_prefix}_*.pt')
-      if len(training_image_paths) > 2:
-        training_image_paths.sort()
-        for i in range(len(training_image_paths)-2):
-          training_image_path = training_image_paths[i]
-          os.remove(training_image_path)
-
-      # save new image
-      model_save_path = f'{model_save_prefix}_{epoch:04d}.pt'
-      print('saving checkpoint', model_save_path)
-      torch.save(
-        {
-            'epoch': epoch,
-            'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'loss': loss,
-            'global_trnloss': global_trn_loss,
-            'global_valloss': global_val_loss
-        }, model_save_path)
-    
-      if epoch % backup_after_epochs == 0:
-        print('backing up checkpoint', model_save_path)
-        os.system(f'aws s3 cp /data/{model_save_path} s3://guiuan/{model_save_prefix}_{epoch:04d}_{learn_rate}_{global_trn_loss[-1]:.4f}_{(100 * correct.item()/total):.2f}.pt')
+    # save new image
+    model_save_path = f'{model_save_prefix}_{epoch:04d}.pt'
+    print('saving checkpoint', model_save_path)
+    torch.save(
+      {
+          'epoch': epoch,
+          'model_state_dict': model.state_dict(),
+          'optimizer_state_dict': optimizer.state_dict(),
+          'loss': loss,
+          'global_trnloss': global_trn_loss,
+          'global_valloss': global_val_loss
+      }, model_save_path
+    )
+  
+    if epoch % backup_after_epochs == 0:
+      print('backing up checkpoint', model_save_path)
+      os.system(f'aws s3 cp /data/{model_save_path} s3://guiuan/{model_save_prefix}_{epoch:04d}_{learn_rate}_{global_trn_loss[-1]:.4f}_{(100 * correct.item()/total):.2f}.pt')
 
 print("done")
