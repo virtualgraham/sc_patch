@@ -32,7 +32,7 @@ def resize_image(tuple_value):
 
 print("Starting", len(image_paths))
 
-pool = ThreadPool(4)
+pool = ThreadPool(15)
 pool.imap(resize_image, enumerate(image_paths))
 pool.close()
 pool.join()
