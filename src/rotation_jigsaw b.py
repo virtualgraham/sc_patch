@@ -1,35 +1,21 @@
-import torch
-import torch.nn as nn
-from torch.autograd import Variable
-import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader
-from torchvision import models, datasets
- 
-import torchvision
-from torchvision import transforms
-from torchvision import models
- 
-import torch.nn.functional as F
-import torchvision.transforms.functional as TF
- 
-from PIL import Image
-import numpy as np
-import os
-import matplotlib.pyplot as plt
 import random
 import time
-
-from tqdm import tqdm # progress bar
-
-import skimage
-import cv2
-
 from glob import glob
-
-from torchsummary import summary
-
 import math
 import os
+
+from PIL import Image
+import numpy as np
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms
+
+from torchsummary import summary
+from tqdm import tqdm # progress bar
+
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
@@ -42,8 +28,8 @@ print(device)
 # Parameters 
 #########################################
 
-training_image_paths = glob('/data/open-images-dataset/train/*.jpg')
-validation_image_paths = glob('/data/open-images-dataset/validation/*.jpg')
+training_image_paths = glob('/data/mini-open-images-dataset/train/*.jpg')
+validation_image_paths = glob('/data/mini-open-images-dataset/validation/*.jpg')
 
 train_dataset_length = 40960
 validation_dataset_length = 40960
@@ -53,8 +39,8 @@ num_epochs = 3000
 backup_after_epochs = 10 
 model_save_prefix = "rotation_jigsaw_b"
 color_shift = 1
-patch_dim = 96
-jitter = 16
+patch_dim = 128
+jitter = 24
 gray_portion = .30
 reuse_image_count = 4
 
@@ -111,8 +97,6 @@ class ShufflePatchDataset(Dataset):
     
     self.min_image_width = self.window_width + 2*self.jitter
 
-    self.saliency = cv2.saliency.StaticSaliencyFineGrained_create()
-
   def __len__(self):
     return self.length
 
@@ -150,13 +134,12 @@ class ShufflePatchDataset(Dataset):
     
     if self.image_reused == 0:
       pil_image = Image.open(self.image_paths[image_index]).convert('RGB')
-
-      if pil_image.size[1] > pil_image.size[0]:
-        self.pil_image = pil_image.resize((self.min_image_width, int(round(pil_image.size[1]/pil_image.size[0] * self.min_image_width))))
-      else:
-        self.pil_image = pil_image.resize((int(round(pil_image.size[0]/pil_image.size[1] * self.min_image_width)), self.min_image_width))
-
+      # if pil_image.size[1] > pil_image.size[0]:
+      #   self.pil_image = pil_image.resize((self.min_image_width, int(round(pil_image.size[1]/pil_image.size[0] * self.min_image_width))))
+      # else:
+      #   self.pil_image = pil_image.resize((int(round(pil_image.size[0]/pil_image.size[1] * self.min_image_width)), self.min_image_width))
       self.image_reused = reuse_image_count - 1
+
     else:
       self.image_reused -= 1
 
@@ -379,7 +362,7 @@ if len(training_image_paths) > 0:
 # Training/Validation Engine
 ############################
 
-print("starting train loop (b.0)")
+print("starting train loop (-.-)")
 
 for epoch in range(last_epoch+1, num_epochs):
     print("epoch", epoch)
