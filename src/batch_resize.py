@@ -7,7 +7,7 @@ import os
 
 root_dir = 'open-images-dataset''
 image_paths = glob('/data/open-images-dataset/*/*.jpg')
-shortest_dim_size = 404 # 2*(128 + 2*24 + 2*1) + 2*24
+shortest_dim_size = 348 # 2*(128 + 2*22 + 2*1)
 
 
 def resize_image(tuple_value):

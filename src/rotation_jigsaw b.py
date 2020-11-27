@@ -40,7 +40,7 @@ backup_after_epochs = 10
 model_save_prefix = "rotation_jigsaw_b"
 color_shift = 1
 patch_dim = 128
-jitter = 24
+jitter = 22
 gray_portion = .30
 reuse_image_count = 4
 
@@ -95,7 +95,7 @@ class ShufflePatchDataset(Dataset):
     self.sub_window_width = self.patch_dim + 2*self.jitter + 2*self.color_shift
     self.window_width = 2*self.sub_window_width
     
-    self.min_image_width = self.window_width + 2*self.jitter
+    # self.min_image_width = self.window_width
 
   def __len__(self):
     return self.length
