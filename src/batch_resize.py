@@ -5,7 +5,7 @@ from multiprocessing.dummy import Pool as ThreadPool
 import os 
 
 
-root_dir = 'open-images-dataset''
+root_dir = 'open-images-dataset'
 image_paths = glob('/data/open-images-dataset/*/*.jpg')
 shortest_dim_size = 348 # 2*(128 + 2*22 + 2*1)
 
