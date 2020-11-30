@@ -29,8 +29,8 @@ class Normalize:
 
 
 class MoCoFeatureExtractor():
-    def __init__(self):
-        checkpoint = torch.load('/data/moco_v2_800ep_pretrain.pth.tar', map_location="cpu")
+    def __init__(self, params_path='/data/moco_v2_800ep_pretrain.pth.tar'):
+        checkpoint = torch.load(params_path, map_location="cpu")
         model = torchvision.models.resnet50()
 
         # rename moco pre-trained keys
