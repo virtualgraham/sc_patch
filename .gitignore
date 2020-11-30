@@ -1,6 +1,6 @@
 .history
 .DS_Store
 .ipynb_checkpoints
-dataset_100
+dataset_*
 /data
 __pycache__
