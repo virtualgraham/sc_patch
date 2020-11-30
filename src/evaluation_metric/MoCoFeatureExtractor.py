@@ -6,6 +6,8 @@ from torchvision import transforms
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+print(device)
+
 class ToTensor:
     def __init__(self):
         self.max = 255
@@ -30,8 +32,8 @@ class Normalize:
 
 class MoCoFeatureExtractor():
     def __init__(self, params_path='/data/moco_v2_800ep_pretrain.pth.tar'):
-        checkpoint = torch.load(params_path, map_location="cpu")
-        model = torchvision.models.resnet50()
+        checkpoint = torch.load(params_path, map_location=device)
+        model = torchvision.models.resnet50().to(device)
 
         # rename moco pre-trained keys
         state_dict = checkpoint['state_dict']
